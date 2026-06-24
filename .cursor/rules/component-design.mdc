@@ -1,0 +1,1069 @@
+---
+alwaysApply: true
+---
+
+# TypeScript & TSX File Structure Standards
+
+## Overview
+
+This document defines the mandatory file structure and organization patterns for all TypeScript (`.ts`) and TSX (`.tsx`) files in the project. Following these standards ensures consistency, maintainability, and readability across the codebase.
+
+---
+
+## Core Principles
+
+### ABSOLUTE REQUIREMENTS
+
+1. **Consistent Structure** - Every file follows the same organizational pattern
+2. **Section Comments** - All sections must be clearly marked with comment headers
+3. **Import Organization** - Imports grouped and ordered by category
+4. **Type Safety** - All types defined before usage
+5. **No Inline Definitions** - Extract objects, arrays, and functions from props/calls
+6. **Single Responsibility** - Each file has one clear purpose
+7. **Constants Before Usage** - Place constants before they are accessed to avoid initialization errors
+
+---
+
+## Universal File Structure Rules
+
+### Rule 1: Import Consolidation
+
+**REQUIRED**: When importing multiple items from the same file, use single-line imports.
+
+```typescript
+// BAD - Multiple import statements from same file
+import { Icon1 } from 'lucide-react';
+import { Icon2 } from 'lucide-react';
+import { Icon3 } from 'lucide-react';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+
+// GOOD - Single import statement per file
+import { Icon1, Icon2, Icon3 } from 'lucide-react';
+import { Button, Input } from '../components/ui';
+```
+
+### Rule 2: Section Organization
+
+**REQUIRED**: All files must use clear section comments to organize code.
+
+```typescript
+// ============================================================================
+// SECTION NAME
+// ============================================================================
+```
+
+---
+
+## TypeScript File Structure (`.ts`)
+
+### Standard Structure Pattern
+
+```typescript
+// ============================================================================
+// IMPORTS
+// ============================================================================
+
+// Node/External Libraries
+import { z } from 'zod';
+import axios from 'axios';
+
+// Project Utilities
+import { formatDate, validateEmail } from '../utils/helpers';
+
+// Types
+import type { User, Workspace, ApiResponse } from '../types';
+
+// Constants
+import { API_BASE_URL, DEFAULT_TIMEOUT } from '../config/constants';
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+export interface ServiceConfig {
+  baseUrl: string;
+  timeout: number;
+  retryAttempts: number;
+}
+
+export interface ServiceResponse<T> {
+  data: T;
+  status: number;
+  error?: string;
+}
+
+export type ErrorHandler = (error: Error) => void;
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const DEFAULT_CONFIG: ServiceConfig = {
+  baseUrl: API_BASE_URL,
+  timeout: DEFAULT_TIMEOUT,
+  retryAttempts: 3,
+};
+
+const HTTP_METHODS = {
+  GET: 'GET',
+  POST: 'POST',
+  PUT: 'PUT',
+  DELETE: 'DELETE',
+} as const;
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+const buildUrl = (baseUrl: string, path: string): string => {
+  return `${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+};
+
+const handleError = (error: unknown): Error => {
+  if (error instanceof Error) {
+    return error;
+  }
+  return new Error('Unknown error occurred');
+};
+
+// ============================================================================
+// VALIDATION SCHEMAS
+// ============================================================================
+
+const userSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email(),
+  name: z.string().min(1),
+});
+
+const workspaceSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  ownerId: z.string().uuid(),
+});
+
+// ============================================================================
+// CLASS DEFINITIONS
+// ============================================================================
+
+export class ApiService {
+  private config: ServiceConfig;
+  private client: typeof axios;
+
+  constructor(config?: Partial<ServiceConfig>) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.client = axios.create({
+      baseURL: this.config.baseUrl,
+      timeout: this.config.timeout,
+    });
+  }
+
+  async get<T>(path: string): Promise<ServiceResponse<T>> {
+    try {
+      const response = await this.client.get<T>(path);
+      return {
+        data: response.data,
+        status: response.status,
+      };
+    } catch (error) {
+      throw handleError(error);
+    }
+  }
+
+  async post<T>(path: string, data: unknown): Promise<ServiceResponse<T>> {
+    try {
+      const response = await this.client.post<T>(path, data);
+      return {
+        data: response.data,
+        status: response.status,
+      };
+    } catch (error) {
+      throw handleError(error);
+    }
+  }
+}
+
+// ============================================================================
+// FACTORY FUNCTIONS
+// ============================================================================
+
+export const createApiService = (config?: Partial<ServiceConfig>): ApiService => {
+  return new ApiService(config);
+};
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+export const apiService = createApiService();
+
+export { buildUrl, handleError };
+```
+
+---
+
+## React/NEXT Component File Structure (`.tsx`)
+
+### Standard Structure Pattern
+
+```typescript
+// ============================================================================
+// IMPORTS
+// ============================================================================
+
+// React Core (React, hooks, router)
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+
+// Icons (Lucide React icons)
+import { PlusCircle, AlertCircle, Search, Filter } from 'lucide-react';
+
+// Components - UI (Base UI components)
+import { Button, Input, Modal } from '../components/ui';
+
+// Components - Feature (Feature-specific components)
+import { TasksTable, UserCard } from '../components/features';
+
+// Services (API and external services)
+import { apiService } from '../services/api/apiService';
+
+// Stores (State management)
+import { useStore, useAuthStore } from '../stores';
+
+// Hooks (Custom hooks)
+import { useCustomLogic, useDebounce } from '../hooks';
+
+// Utils (Utility functions)
+import { formatDate, validateData } from '../utils/helpers';
+
+// Types (TypeScript definitions)
+import type { ComponentProps, CustomTypes } from '../types/component';
+
+// Constants (Configuration values)
+import { STORAGE_KEYS, MAX_ITEMS } from '../lib/constants';
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+interface CustomProps {
+  id: string;
+  name: string;
+  onAction?: (id: string) => void;
+}
+
+interface StateTypes {
+  loading: boolean;
+  error: Error | null;
+  data: CustomData[];
+}
+
+type ViewMode = 'list' | 'grid' | 'table';
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const DEFAULT_VIEW_MODE: ViewMode = 'list';
+
+const VIEW_MODE_OPTIONS = [
+  { value: 'list', label: 'List View' },
+  { value: 'grid', label: 'Grid View' },
+  { value: 'table', label: 'Table View' },
+] as const;
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+const formatDisplayValue = (value: string): string => {
+  return value.toUpperCase();
+};
+
+const validateInput = (input: string): boolean => {
+  return input.length > 0;
+};
+
+// ============================================================================
+// CUSTOM HOOKS
+// ============================================================================
+
+const useComponentLogic = (props: CustomProps) => {
+  const [state, setState] = useState<StateTypes>({
+    loading: false,
+    error: null,
+    data: [],
+  });
+
+  const performAction = useCallback(async () => {
+    setState((prev) => ({ ...prev, loading: true }));
+    try {
+      // Logic implementation
+      const result = await apiService.get(`/data/${props.id}`);
+      setState((prev) => ({ ...prev, data: result.data, loading: false }));
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        error: error instanceof Error ? error : new Error('Unknown error'),
+        loading: false,
+      }));
+    }
+  }, [props.id]);
+
+  return {
+    state,
+    performAction,
+  };
+};
+
+// ============================================================================
+// SUB-COMPONENTS
+// ============================================================================
+
+const ComponentHeader: React.FC<{ title: string }> = ({ title }) => {
+  return (
+    <div className="component-header">
+      <h1>{title}</h1>
+    </div>
+  );
+};
+
+const ComponentActions: React.FC<{ onPrimary: () => void }> = ({ onPrimary }) => {
+  return (
+    <Button onClick={onPrimary}>Primary Action</Button>
+  );
+};
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+const ComponentName: React.FC<CustomProps> = ({ id, name, onAction }) => {
+  // ============================================================================
+  // HOOKS - Stores & Context
+  // ============================================================================
+  const { data, loading } = useStore();
+  const { user } = useAuthStore();
+
+  // ============================================================================
+  // HOOKS - Router
+  // ============================================================================
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  // ============================================================================
+  // STATE - Core Data
+  // ============================================================================
+  const [items, setItems] = useState<Item[]>([]);
+  const [selectedId, setSelectedId] = useState<string>('');
+
+  // ============================================================================
+  // STATE - UI Control
+  // ============================================================================
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(DEFAULT_VIEW_MODE);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // ============================================================================
+  // STATE - Loading & Error
+  // ============================================================================
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  // ============================================================================
+  // CUSTOM HOOKS - Business Logic
+  // ============================================================================
+  const { filteredItems, setFilter } = useComponentLogic({ id, name, onAction });
+
+  // ============================================================================
+  // COMPUTED VALUES
+  // ============================================================================
+  const displayItems = useMemo(
+    () =>
+      filteredItems.filter((item) =>
+        item.name.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+    [filteredItems, searchTerm]
+  );
+
+  const hasItems = useMemo(() => displayItems.length > 0, [displayItems]);
+
+  const viewModeConfig = useMemo(
+    () => ({
+      mode: viewMode,
+      options: VIEW_MODE_OPTIONS,
+    }),
+    [viewMode]
+  );
+
+
+  // ============================================================================
+  // FUNCTIONS - Event Handlers
+  // ============================================================================
+  const handleItemClick = useCallback(
+    (itemId: string) => {
+      setSelectedId(itemId);
+      onAction?.(itemId);
+    },
+    [onAction]
+  );
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchTerm(value);
+  }, []);
+
+  const handleModalToggle = useCallback(() => {
+    setIsModalOpen((prev) => !prev);
+  }, []);
+
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+  }, []);
+
+  // ============================================================================
+  // FUNCTIONS - Data Operations
+  // ============================================================================
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await apiService.getData(id);
+      setItems(result);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Unknown error'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id]);
+
+  // ============================================================================
+  // EFFECTS - Initialization
+  // ============================================================================
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // ============================================================================
+  // EFFECTS - URL Synchronization
+  // ============================================================================
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const searchParam = params.get('search');
+
+    if (searchParam) {
+      setSearchTerm(searchParam);
+    }
+  }, [location.search]);
+
+  // ============================================================================
+  // EFFECTS - Keyboard Shortcuts
+  // ============================================================================
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsModalOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // ============================================================================
+  // RENDER - Computed JSX Elements
+  // ============================================================================
+  const headerActions = useMemo(
+    () => <Button onClick={handleModalToggle}>Add New</Button>,
+    [handleModalToggle]
+  );
+
+  const searchAndFilterBar = useMemo(
+    () => (
+      <div className="search-filter-bar">
+        <Input
+          value={searchTerm}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="Search..."
+        />
+        <Button onClick={() => setFilter('')}>Clear Filter</Button>
+      </div>
+    ),
+    [searchTerm, handleSearchChange, setFilter]
+  );
+
+  // ============================================================================
+  // RENDER - Main Component
+  // ============================================================================
+  return (
+    <div className="component-container">
+      {/* Header */}
+      <ComponentHeader title={name} />
+
+      {/* Search and Filters */}
+      {searchAndFilterBar}
+
+      {/* Content */}
+      {isLoading ? (
+        <LoadingSpinner />
+      ) : error ? (
+        <ErrorDisplay error={error} onRetry={loadData} />
+      ) : (
+        <ContentArea
+          items={displayItems}
+          onItemClick={handleItemClick}
+          viewMode={viewMode}
+        />
+      )}
+
+      {/* Actions */}
+      <ComponentActions onPrimary={handleModalToggle} />
+
+      {/* Modal */}
+      <Modal isOpen={isModalOpen} onClose={handleModalToggle} title="Modal Title">
+        <ModalContent />
+      </Modal>
+    </div>
+  );
+};
+
+export default ComponentName;
+```
+
+---
+
+## Section Organization Rules
+
+### 1. IMPORTS Section
+
+**Order of Import Groups:**
+
+1. React Core (React, hooks, router)
+2. External Libraries (lodash, axios, etc.)
+3. Icons (Lucide React)
+4. Components - UI (Base components)
+5. Components - Feature (Feature-specific)
+6. Services (API, external services)
+7. Stores (State management)
+8. Hooks (Custom hooks)
+9. Utils (Helper functions)
+10. Types (TypeScript definitions)
+11. Constants (Configuration)
+
+**Rules:**
+- Group imports by category with comment headers
+- **REQUIRED**: Use single-line imports for multiple items from same file (never split across multiple lines)
+- Order alphabetically within each group
+- Separate groups with blank lines
+
+```typescript
+// ============================================================================
+// IMPORTS
+// ============================================================================
+
+// React Core
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+
+// External Libraries
+import axios from 'axios';
+import { z } from 'zod';
+
+// Icons
+import { Plus, Search, Filter, Edit, Trash } from 'lucide-react';
+
+// Components - UI
+import { Button, Input, Modal, Card } from '../components/ui';
+
+// Types
+import type { User, Workspace } from '../types';
+
+// Constants
+import { API_BASE_URL, TIMEOUT } from '../config/constants';
+```
+
+### 2. TYPE DEFINITIONS Section
+
+**Rules:**
+- Define all interfaces and types before usage
+- Group related types together
+- Use clear, descriptive names
+- Export types that are used in other files
+
+```typescript
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+// Component Props
+export interface ComponentProps {
+  id: string;
+  name: string;
+  onAction?: (id: string) => void;
+}
+
+// State Types
+interface ComponentState {
+  loading: boolean;
+  error: Error | null;
+  data: DataItem[];
+}
+
+// Utility Types
+type ViewMode = 'list' | 'grid' | 'table';
+type SortOrder = 'asc' | 'desc';
+```
+
+### 3. CONSTANTS Section
+
+**Rules:**
+- Define all constants before they are used
+- Use UPPER_SNAKE_CASE for primitive constants
+- Use PascalCase for object constants
+- Group related constants together
+
+```typescript
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+// Configuration
+const API_TIMEOUT = 5000;
+const MAX_RETRY_ATTEMPTS = 3;
+
+// Default Values
+const DEFAULT_VIEW_MODE: ViewMode = 'list';
+const DEFAULT_PAGE_SIZE = 20;
+
+// Options
+const SORT_OPTIONS = [
+  { value: 'name', label: 'Name' },
+  { value: 'date', label: 'Date' },
+  { value: 'status', label: 'Status' },
+] as const;
+```
+
+### 4. UTILITY FUNCTIONS Section (`.ts` files)
+
+**Rules:**
+- Pure functions only (no side effects)
+- Export functions used in other files
+- Document complex logic with JSDoc
+
+```typescript
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Formats a date string to a human-readable format
+ */
+const formatDate = (date: string): string => {
+  return new Date(date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
+
+/**
+ * Validates an email address
+ */
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+export { formatDate, validateEmail };
+```
+
+### 5. CUSTOM HOOKS Section (`.tsx` files)
+
+**Rules:**
+- Extract complex logic into reusable hooks
+- Prefix hook names with 'use'
+- Return object with clear property names
+- Use proper memoization
+
+```typescript
+// ============================================================================
+// CUSTOM HOOKS
+// ============================================================================
+
+const useComponentLogic = (props: ComponentProps) => {
+  const [state, setState] = useState<ComponentState>({
+    loading: false,
+    error: null,
+    data: [],
+  });
+
+  const loadData = useCallback(async () => {
+    setState((prev) => ({ ...prev, loading: true }));
+    try {
+      const result = await fetchData(props.id);
+      setState((prev) => ({ ...prev, data: result, loading: false }));
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        error: error instanceof Error ? error : new Error('Unknown error'),
+        loading: false,
+      }));
+    }
+  }, [props.id]);
+
+  return { state, loadData };
+};
+```
+
+### 6. CLASS DEFINITIONS Section (`.ts` files)
+
+**Rules:**
+- Define classes with clear responsibilities
+- Use private/public modifiers appropriately
+- Document complex methods
+
+```typescript
+// ============================================================================
+// CLASS DEFINITIONS
+// ============================================================================
+
+export class ApiService {
+  private baseUrl: string;
+  private timeout: number;
+
+  constructor(config: ServiceConfig) {
+    this.baseUrl = config.baseUrl;
+    this.timeout = config.timeout;
+  }
+
+  async get<T>(path: string): Promise<T> {
+    // Implementation
+  }
+
+  async post<T>(path: string, data: unknown): Promise<T> {
+    // Implementation
+  }
+}
+```
+
+### 7. MAIN COMPONENT Section (`.tsx` files)
+
+**Component Internal Structure:**
+
+```typescript
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+const ComponentName: React.FC<Props> = (props) => {
+  // HOOKS - Stores & Context
+  const store = useStore();
+
+  // HOOKS - Router
+  const navigate = useNavigate();
+
+  // STATE - Core Data
+  const [data, setData] = useState([]);
+
+  // STATE - UI Control
+  const [isOpen, setIsOpen] = useState(false);
+
+  // STATE - Loading & Error
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // CUSTOM HOOKS
+  const { computed } = useCustomHook();
+
+  // COMPUTED VALUES
+  const filtered = useMemo(() => /* ... */, []);
+
+  // FUNCTIONS - Event Handlers
+  const handleClick = useCallback(() => {}, []);
+
+  // FUNCTIONS - Data Operations
+  const loadData = useCallback(async () => {}, []);
+
+  // EFFECTS - Initialization
+  useEffect(() => {}, []);
+
+  // EFFECTS - Synchronization
+  useEffect(() => {}, []);
+
+  // RENDER - Computed JSX
+  const header = useMemo(() => <Header />, []);
+
+  // RENDER - Main Component
+  return <div>{/* JSX */}</div>;
+};
+```
+
+---
+
+## Prohibited Patterns
+
+###  NEVER Use IIFE/IIME in JSX
+
+```typescript
+//  BAD - IIFE in JSX
+return (
+  <div>
+    {(() => {
+      const value = computeSomething();
+      return <span>{value}</span>;
+    })()}
+  </div>
+);
+
+//  GOOD - Use computed values
+const computedValue = useMemo(() => computeSomething(), [deps]);
+
+return (
+  <div>
+    <span>{computedValue}</span>
+  </div>
+);
+```
+
+###  NEVER Use Inline Objects/Arrays in Props
+
+```typescript
+//  BAD - Inline object/array
+<Component
+  config={{ enabled: true, timeout: 5000 }}
+  items={[{ id: 1 }, { id: 2 }]}
+  onChange={(value) => console.log(value)}
+/>
+
+//  GOOD - Define in computed values section
+const config = useMemo(() => ({ enabled: true, timeout: 5000 }), []);
+const items = useMemo(() => [{ id: 1 }, { id: 2 }], []);
+const handleChange = useCallback((value) => console.log(value), []);
+
+<Component config={config} items={items} onChange={handleChange} />
+```
+
+---
+
+## Import/Export Patterns
+
+### Named Exports (Preferred)
+
+```typescript
+//  GOOD - Named exports
+export const formatDate = (date: string) => { /* ... */ };
+export const validateEmail = (email: string) => { /* ... */ };
+export class ApiService { /* ... */ }
+export interface User { /* ... */ }
+
+// Import
+import { formatDate, validateEmail, ApiService, User } from './utils';
+```
+
+### Default Exports (Components Only)
+
+```typescript
+//  GOOD - Default export for components
+const ComponentName: React.FC<Props> = (props) => {
+  return <div>{/* ... */}</div>;
+};
+
+export default ComponentName;
+
+// Import
+import ComponentName from './ComponentName';
+```
+
+### Barrel Exports (index.ts)
+
+```typescript
+// components/ui/index.ts
+export { Button } from './Button';
+export { Input } from './Input';
+export { Modal } from './Modal';
+
+// Usage
+import { Button, Input, Modal } from '../components/ui';
+```
+
+---
+
+## File Organization Best Practices
+
+### 1. Single Responsibility
+
+Each file should have one primary purpose:
+
+- **Service files**: One service class or related functions
+- **Component files**: One main component with sub-components
+- **Utility files**: Related utility functions
+- **Type files**: Related type definitions
+
+### 2. File Size Limits
+
+- **Components**: Max 300 lines (extract sub-components if larger)
+- **Services**: Max 400 lines (split into multiple services if larger)
+- **Utilities**: Max 200 lines (split into multiple files if larger)
+
+### 3. Naming Conventions
+
+```typescript
+// Components - PascalCase
+ComponentName.tsx
+UserProfile.tsx
+DataTable.tsx
+
+// Services - camelCase
+apiService.ts
+authService.ts
+storageService.ts
+
+// Utilities - camelCase
+formatters.ts
+validators.ts
+helpers.ts
+
+// Types - camelCase with .types suffix
+user.types.ts
+api.types.ts
+component.types.ts
+
+// Hooks - camelCase with 'use' prefix
+useAuth.ts
+useData.ts
+useModal.ts
+
+// Redux Store modules
+example.slice.ts
+example.thunk.ts
+example.types.ts
+
+// Services - camelCase with .service suffix
+token-refresh.service.ts
+logout.service.ts
+nextauth.config.ts
+```
+
+---
+
+## Environment Variables and Routes
+
+### Using Environment Variables
+
+**REQUIRED**: Always use environment variables for configuration values instead of hardcoding.
+
+**Rules:**
+- Use `process.env.NEXT_PUBLIC_*` for client-side accessible variables
+- Use `process.env.*` for server-side only variables
+- Always provide fallback values for development
+- Document required environment variables in `.env.example`
+
+**Example:**
+
+```typescript
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+// GOOD - Use environment variables with fallback
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET;
+
+// BAD - Hardcoded values
+const API_BASE_URL = "http://localhost:4000";
+```
+
+### Using Route Constants
+
+**REQUIRED**: Always use route constants from `src/utils/routes.ts` instead of hardcoding API endpoints.
+
+**Rules:**
+- Import `ROUTES` from `@/utils/routes` for API routes
+- Import `NEXT_ROUTES` from `@/utils/routes` for Next.js page routes
+- Never hardcode API endpoints or page paths
+- Add new routes to `routes.ts` if they don't exist
+
+**Example:**
+
+```typescript
+// ============================================================================
+// IMPORTS
+// ============================================================================
+
+// Project Utilities
+import { ROUTES, NEXT_ROUTES } from "@/utils/routes";
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+// GOOD - Use route constants
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const LOGIN_ENDPOINT = `${API_BASE_URL}${ROUTES.AUTH.LOGIN}`;
+const LOGIN_PAGE = NEXT_ROUTES.AUTH.LOGIN;
+
+// BAD - Hardcoded routes
+const LOGIN_ENDPOINT = "http://localhost:4000/api/auth/login";
+const LOGIN_PAGE = "/auth/login";
+```
+
+**Route File Structure:**
+
+```typescript
+// src/utils/routes.ts
+export const ROUTES = {
+  AUTH: {
+    BASE: '/api/auth',
+    LOGIN: '/api/auth/login',
+    REFRESH: '/api/auth/refresh',
+    // ... other routes
+  },
+  // ... other route groups
+};
+
+export const NEXT_ROUTES = {
+  AUTH: {
+    LOGIN: '/auth/login',
+    // ... other page routes
+  },
+  // ... other route groups
+};
+```
+
+---
+
+## Quick Reference Checklist
+
+When creating or refactoring a TypeScript file, verify:
+
+- Section comments are present and in correct order
+- Imports are grouped and consolidated (single line per file)
+- Types are defined before usage
+- Constants are defined before they are referenced
+- Environment variables are used instead of hardcoded values
+- Route constants are used instead of hardcoded paths
+- No IIFE/IIME patterns in JSX
+- No inline objects/arrays/functions in props
+- Proper memoization (useMemo, useCallback)
+- Clear, descriptive variable names
+- Consistent naming conventions
+- File follows single responsibility principle
+- Code is organized within appropriate sections
+
+---
+
+## Migration Guide
+
+When refactoring existing files:
+
+1. **Add section comments** - Organize existing code into sections
+2. **Consolidate imports** - Combine multiple imports from same file
+3. **Extract inline definitions** - Move objects/arrays/functions to computed values
+4. **Add proper types** - Define interfaces for all props and state
+5. **Extract utility functions** - Move pure functions to utility section
+6. **Extract custom hooks** - Move complex logic to custom hooks
+7. **Add memoization** - Wrap computed values and callbacks appropriately
+8. **Verify order** - Ensure sections follow the standard order
+
+---

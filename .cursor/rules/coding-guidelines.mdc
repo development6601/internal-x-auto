@@ -1,0 +1,296 @@
+---
+alwaysApply: true
+---
+
+Here is a **clean, short, numbered, Cursor-ready “Coding Rules” file** exactly in the format you requested:
+
+---
+
+# **Coding Rules & Guidelines**
+
+### **1. Cloudinary Deletion Rules**
+
+- Every Cloudinary-related **delete API must delete the actual asset** from Cloudinary.
+- Always remove the image using the Cloudinary SDK before marking anything deleted in the DB.
+- Never leave unused Cloudinary files behind.
+
+---
+
+### **2. Soft Delete Handling**
+
+- No API should return **soft-deleted records**.
+- For Delete API, always use soft delete, add `{ isDeleted: false }` in DB queries (service layer or model scope). Unless hard delete is specified explicitly.
+- Validate filters so soft-deleted items never appear in lists or details.
+- **Always filter soft-deleted records in ALL database queries**:
+
+  - Use `{ isDeleted: false }` in `where` clauses for `findMany`, `findFirst`, `findUnique`, `count`, `aggregate`, etc.
+  - Never query without checking `isDeleted` unless explicitly querying deleted records for admin purposes.
+  - Apply this to all models with soft delete: User, UserProfile, BusinessProfile, Dog, Listing, Category, ListingClaim, etc.
+  - Example:
+
+    ```typescript
+    // ✅ Correct
+    const profile = await prisma.businessProfile.findFirst({
+      where: { ownerId, isDeleted: false },
+    });
+
+    // ❌ Wrong - missing isDeleted filter
+    const profile = await prisma.businessProfile.findFirst({
+      where: { ownerId },
+    });
+    ```
+
+---
+
+### **3. Avoid IIFE**
+
+- Do **not** use Immediately Invoked Function Expressions anywhere.
+- Use standard async functions or named functions instead.
+
+---
+
+### **4. API Update Process**
+
+- When updating **any API** (controller, routes, service, constants, server, config):
+
+  - Swagger **must** be updated accordingly.
+  - Swagger files are located at:
+    `projectroot/src/services/swagger/`
+  - Ensure request body, params, responses, and examples stay in sync.
+
+- If another Swagger API entry is incorrect or outdated, **fix it immediately**, even if you didn’t work on that API.
+
+---
+
+### **5. ID Existence Validation**
+
+- If an **ID is provided** (params, body, or query), **always check for its existence** in the database.
+- Return a proper **404 / Not Found** error if the record does not exist.
+- Never proceed with create, update, delete, or relation logic without validating the ID first.
+
+---
+
+### **6. Express Route Ordering**
+
+- In Express route files, **specific routes must come before dynamic/parameterised routes**.
+- Routes are matched in the order they are defined, so dynamic routes like `/:id` will match any string.
+- Always place specific routes (e.g., `/groups`, `/subcategories`) before dynamic routes (e.g., `/:categoryId`, `/:userId`).
+- Example: `GET /api/categories/groups` must be defined before `GET /api/categories/:categoryId` to prevent "groups" from being treated as a category ID.
+
+---
+
+### **7. File Upload Standard Pattern**
+
+- **All file uploads must follow the centralised Cloudinary pattern**:
+
+  1. **Storage Paths Configuration** (`src/utils/constants/storage.ts`):
+
+     - All Cloudinary folder paths **must** be defined in the `STORAGE_PATHS` constant.
+     - Never hardcode Cloudinary paths like `'claims/documents'` directly in controllers or services.
+     - Example:
+       ```typescript
+       export const STORAGE_PATHS = {
+         CLOUDINARY_ROOT:
+           process.env.CLOUDINARY_FOLDER_ROOT ?? "Project/DogSpots/",
+         CLAIMS_PROOF: "claims/documents",
+         LISTINGS_PROOF: "listings/documents",
+       } as const;
+       ```
+
+  2. **Controller Layer**:
+
+     - Extract the **local file path** from multer using `req.file.path`.
+     - Do **NOT** upload to Cloudinary in the controller.
+     - Do **NOT** hardcode any Cloudinary paths.
+     - Pass the local file path to the service layer.
+     - Example:
+       ```typescript
+       const documentPath = (req as any).file?.path as string | undefined;
+       const result = await this.service.createRecord(dto, documentPath);
+       ```
+
+  3. **Service Layer**:
+
+     - Build Cloudinary folder paths using `STORAGE_PATHS` constants.
+     - Do not use or take the storage path from the req
+     - Upload files using `cloudinaryService.uploadFromServer(localFilePath, options)`.
+     - Store the returned Cloudinary URL in the database.
+     - Example:
+
+       ```typescript
+       private buildDocumentPublicId(recordId: string): { folder: string; publicId: string } {
+         const folder = `${STORAGE_PATHS.CLOUDINARY_ROOT}${STORAGE_PATHS.CLAIMS_PROOF}/${recordId}`;
+         const publicId = `${folder}/verification`;
+         return { folder, publicId };
+       }
+
+       private async uploadDocument(recordId: string, filePath: string): Promise<string> {
+         const { folder, publicId } = this.buildDocumentPublicId(recordId);
+         const uploadResult = await cloudinaryService.uploadFromServer(filePath, {
+           folder,
+           publicId,
+           overwrite: true,
+           resourceType: 'auto',
+           type: 'authenticated',
+         });
+         Return uploadResult.secure_url ?? uploadResult.url ?? '';
+       }
+       ```
+
+- **Reference Implementation**: See `src/modules/claims/`, `src/modules/listings/`, or `src/modules/dogs/` for correct examples.
+- **Detailed Documentation**: See `docs/development/file-upload-guidelines.md` for complete flow and examples.
+
+---
+
+### **8. Admin API Organization**
+
+- **All admin APIs must be sectionized and grouped together** in Swagger documentation.
+- Use descriptive tags like `Admin - Listings`, `Admin - Users`, etc., to create clear subsections.
+- Keep all admin-related APIs together in the Swagger UI for better organization and discoverability.
+- When adding new admin APIs, ensure they are placed in the appropriate section and use the correct tag format.
+- Example: Use `tags: ['Admin - Listings']` for listing management APIs and `tags: ['Admin - Users']` for user management APIs.
+
+---
+
+### **9. Import Statement Style**
+
+- **Always use single-line imports** instead of multiline imports for better readability and consistency.
+- Prefer: `import { a, b, c } from './module.js';`
+- Avoid multiline imports unless absolutely necessary for very long lists.
+- Example:
+
+  ```typescript
+  // ✅ Correct
+  import type {
+    SafeUser,
+    PaginatedUsersResponse,
+    UserQueryFilters,
+  } from "../users/types/user.types.js";
+
+  // ❌ Avoid
+  import type {
+    SafeUser,
+    PaginatedUsersResponse,
+    UserQueryFilters,
+  } from "../users/types/user.types.js";
+  ```
+
+---
+
+### **10. Error Handling Rules (Mandatory)**
+
+- Always handle errors in a **clean, flat, and readable way**.
+- Never write complex logic, mappings, or conditionals directly inside response/helper calls.
+- Always prepare error data first, then pass it to the response.
+- This rule applies to **all errors**: validation, query, params, business logic, and API errors.
+
+**Required Pattern:**
+
+```typescript
+const errors = dtoResult.error.issues.map((issue) => ({
+  field: issue.path.join("."),
+  message: issue.message,
+}));
+
+sendBadRequest(res, "Validation failed", errors);
+return;
+```
+
+**Avoid This:**
+
+```typescript
+sendBadRequest(res, 'Validation failed', dtoResult.error.issues.map(...));
+```
+
+- Keep error handling consistent across the entire codebase.
+- This pattern is mandatory and must not be bypassed.
+
+### **11. Route Structure Rule**
+
+- **Always use centralized route constants** (e.g. `ROUTES.MEET_UPS.LEAVE`).
+- **Do not hardcode route paths** like `/:id/action` directly in routers.
+- **Action-specific routes must be explicit** and placed **before dynamic routes** to avoid conflicts.
+
+**Correct:**
+
+```ts
+router.post(ROUTES.MEET_UPS.LEAVE, authenticate, meetUpController.leaveMeetUp);
+```
+
+**Wrong:**
+
+```ts
+router.put("/:userId/bulk", controller.bulkUpdate);
+```
+
+---
+
+### **12. Form-Data Number Coercion (Mandatory)**
+
+- **When using `multipart/form-data` (multer), all form fields are sent as strings**, not their native types.
+- **All number fields in DTOs used with form-data endpoints MUST use `z.coerce.number()`** instead of `z.number()`.
+- This applies to any DTO that is validated when the route uses `upload.single()`, `upload.array()`, or any multer middleware.
+
+**Required Pattern:**
+
+```typescript
+// ✅ Correct - for form-data endpoints
+export const CreateDogDto = z.object({
+  name: z.string().min(1),
+  weight: z.coerce.number().positive().optional(),
+  height: z.coerce.number().positive().optional(),
+});
+
+// ✅ Correct - for form-data with coordinates
+export const CreateLostFoundPostDto = z.object({
+  lastSeenLatitude: z.coerce.number().min(-90).max(90).optional().nullable(),
+  lastSeenLongitude: z.coerce.number().min(-180).max(180).optional().nullable(),
+});
+```
+
+**Avoid This:**
+
+```typescript
+// ❌ Wrong - will fail with form-data
+export const CreateDogDto = z.object({
+  name: z.string().min(1),
+  weight: z.number().positive().optional(), // Will fail: "expected number, received string"
+  height: z.number().positive().optional(),
+});
+```
+
+**When to Apply:**
+
+- ✅ **Apply**: DTOs used with routes that have `upload.single()`, `upload.array()`, or any multer middleware
+- ✅ **Apply**: Any endpoint that accepts `multipart/form-data` content type
+- ❌ **Don't Apply**: DTOs used only with JSON endpoints (they receive proper types)
+- ❌ **Don't Apply**: Query DTOs (query params are always strings and handled separately)
+
+**Common Fields That Need Coercion:**
+
+- `latitude`, `longitude` (coordinates)
+- `weight`, `height` (measurements)
+- `maxParticipants`, `minParticipants` (counts)
+- Any numeric field in form-data payloads
+
+**How to Identify:**
+
+1. Check if the route uses `upload.single()`, `upload.array()`, or multer middleware
+2. Check if the DTO is validated in that route
+3. If both are true, ensure all number fields use `z.coerce.number()`
+
+**Example Routes That Need This:**
+
+```typescript
+// ✅ This route needs z.coerce.number() in CreateDogDto
+router.post(
+  ROUTES.DOGS.CREATE,
+  authenticate,
+  upload.single('profilePicture'),
+  validateDto(CreateDogDto), // weight, height must use z.coerce.number()
+  dogController.createDog
+);
+```
+
+- Keep this pattern consistent across all form-data endpoints.
+- This rule is mandatory and must not be bypassed.
