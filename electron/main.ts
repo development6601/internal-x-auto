@@ -4,14 +4,17 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+
 let mainWindow: BrowserWindow | null = null
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 960,
+    width: 420,
     height: 720,
-    minWidth: 640,
+    minWidth: 400,
+    maxWidth: 500,
     minHeight: 480,
+    maxHeight: 800,
     title: 'InternalX',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
