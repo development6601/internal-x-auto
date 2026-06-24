@@ -3,20 +3,28 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Download, ScrollText } from 'lucide-react'
 import {
   Alert,
   Badge,
   Button,
   Card,
   Checkbox,
-  Eyebrow,
   Input,
   Label,
   Modal,
   RadioGroup,
   SectionLabel,
+  Tooltip,
+  WarningHint,
 } from '@/components/ui'
+import {
+  ACTIVITY_LOG_TOOLTIP,
+  APP_MAX_WIDTH,
+  HIDE_ACTIVITY_LOG_TOOLTIP,
+} from '@/constants/app.constants'
 import type { AutomationMode, AutomationStatus } from '@/types/automation.types'
+import { cn } from '@/utils/cn'
 import { formatDuration, parseTimerInput, timerToSeconds } from '@/utils/format'
 
 // ============================================================================
@@ -26,7 +34,7 @@ import { formatDuration, parseTimerInput, timerToSeconds } from '@/utils/format'
 interface ModeOption {
   value: AutomationMode
   label: string
-  description: string
+  tooltip: React.ReactNode
 }
 
 // ============================================================================
@@ -35,18 +43,62 @@ interface ModeOption {
 
 const APP_NAME = 'InternalX'
 
+const NO_TIMER_TOOLTIP = (
+  <>
+    No stop timer set.
+    <br />
+    Automation will run indefinitely until manually stopped.
+  </>
+)
+
 const MODE_OPTIONS: ModeOption[] = [
   {
     value: 'basic',
-    label: 'Basic Mode',
-    description: 'Browser tab and editor switching only — no application switching.',
+    label: 'Basic',
+    tooltip: (
+      <>
+        Browser tab and editor switching only.
+        <br />
+        No application switching (Alt+Tab).
+      </>
+    ),
   },
   {
     value: 'advanced',
-    label: 'Advanced Mode',
-    description: 'Full activity simulation including Alt+Tab between applications.',
+    label: 'Advanced',
+    tooltip: (
+      <>
+        Full activity simulation across applications.
+        <br />
+        Includes Alt+Tab between browser and editor.
+      </>
+    ),
   },
 ]
+
+const CLOSE_UPWORK_TOOLTIP = (
+  <>
+    Closes the Upwork Desktop App when automation stops.
+    <br />
+    Terminates Upwork.exe if the process is still running.
+  </>
+)
+
+const SHUTDOWN_TOOLTIP = (
+  <>
+    Shuts down the system after automation ends.
+    <br />
+    Shows a 30-second countdown before shutdown — cancel anytime.
+  </>
+)
+
+const EXPORT_LOG_TOOLTIP = (
+  <>
+    Export activity log to a file.
+    <br />
+    Saves the raw log content as-is.
+  </>
+)
 
 const MOCK_LOG_ENTRIES = [
   '[2026-06-24 09:14:22] STOPPED (manual) — Ran for: 01:12:43',
@@ -95,6 +147,7 @@ const App = () => {
   const [showShutdownModal, setShowShutdownModal] = useState(false)
   const [shutdownCountdown, setShutdownCountdown] = useState(30)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [showActivityLog, setShowActivityLog] = useState(false)
 
   // ============================================================================
   // COMPUTED VALUES
@@ -111,6 +164,10 @@ const App = () => {
   const isActive = isRunning || isCountdown
   const statusBadge = useMemo(() => getStatusBadge(status), [status])
   const controlsDisabled = isActive
+
+  const activityLogTooltip = showActivityLog
+    ? HIDE_ACTIVITY_LOG_TOOLTIP
+    : ACTIVITY_LOG_TOOLTIP
 
   const remainingDisplay = useMemo(() => {
     if (!isRunning) return null
@@ -166,6 +223,10 @@ const App = () => {
 
   const handleExportLog = useCallback(() => {
     // IPC integration will be added in a later phase
+  }, [])
+
+  const handleToggleActivityLog = useCallback(() => {
+    setShowActivityLog((prev) => !prev)
   }, [])
 
   // ============================================================================
@@ -239,40 +300,72 @@ const App = () => {
   // RENDER - Main Component
   // ============================================================================
   return (
-    <div className="min-h-full flex flex-col relative">
-      {/* Header */}
-      <header className="border-b border-editorial-border bg-editorial-base px-6 py-5">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <Eyebrow className="mb-3">Internal Automation</Eyebrow>
-            <h1 className="font-display text-4xl font-light text-editorial-text-primary leading-none">
+    <div className="h-full w-full flex justify-center bg-editorial-base overflow-hidden">
+      <div
+        className="w-full h-full flex flex-col relative overflow-hidden"
+        style={{ maxWidth: APP_MAX_WIDTH }}
+      >
+        {/* Header */}
+        <header className="relative z-20 flex-shrink-0 border-b border-editorial-border bg-editorial-base px-4 sm:px-5 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="font-display text-[23px] sm:text-[29px] font-extralight text-editorial-text-primary leading-none truncate">
               {APP_NAME}
             </h1>
-          </div>
-          <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
-        </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="flex-1 p-6 grid grid-cols-1 xl:grid-cols-2 gap-6 min-h-0">
-        {/* Left Column — Configuration */}
-        <div className="flex flex-col gap-6 overflow-y-auto">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+              <Tooltip content={activityLogTooltip} maxWidth={220} placement="bottom">
+                <button
+                  type="button"
+                  onClick={handleToggleActivityLog}
+                  aria-label={showActivityLog ? 'Hide activity log' : 'Show activity log'}
+                  aria-pressed={showActivityLog}
+                  className={cn(
+                    'inline-flex items-center justify-center w-8 h-8 rounded-editorial border-[1.5px]',
+                    'transition-colors duration-150',
+                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-editorial-primary focus-visible:outline-offset-2',
+                    showActivityLog
+                      ? 'border-editorial-primary bg-editorial-primary text-white'
+                      : 'border-editorial-border text-editorial-muted hover:bg-editorial-secondary hover:text-editorial-text-primary',
+                  )}
+                >
+                  <ScrollText size={16} strokeWidth={2} />
+                </button>
+              </Tooltip>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 p-3 sm:p-4 min-h-0 flex flex-col gap-3 sm:gap-4 overflow-y-auto">
           {/* Mode Selector */}
-          <Card>
-            <SectionLabel>Automation Mode</SectionLabel>
+          <Card padding="xs">
+            <div className="px-2 pt-2 pb-1">
+              <SectionLabel className="mb-2">Automation Mode</SectionLabel>
+            </div>
             <RadioGroup
               name="automation-mode"
               value={mode}
               options={MODE_OPTIONS}
               onChange={setMode}
               disabled={controlsDisabled}
+              layout="inline"
             />
           </Card>
 
           {/* Timer Configuration */}
-          <Card>
-            <SectionLabel>Stop Timer</SectionLabel>
-            <div className="grid grid-cols-2 gap-4">
+          <Card padding="sm">
+            <div className="flex items-center justify-between gap-2 border-b border-editorial-border pb-2 mb-4">
+              <SectionLabel bordered={false} className="mb-0 pb-0">
+                Stop Timer
+              </SectionLabel>
+              {hasNoTimer && (
+                <Tooltip content={NO_TIMER_TOOLTIP} maxWidth={240} placement="auto">
+                  <WarningHint aria-label="No timer set warning" />
+                </Tooltip>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="timer-hours">Hours</Label>
                 <Input
@@ -300,146 +393,165 @@ const App = () => {
                 />
               </div>
             </div>
-            {hasNoTimer && (
-              <Alert variant="warning" title="No Timer Set" className="mt-4">
-                No stop timer set. Automation will run indefinitely until manually stopped.
-              </Alert>
-            )}
           </Card>
 
           {/* Options */}
-          <Card>
+          <Card padding="sm">
             <SectionLabel>Post-Stop Options</SectionLabel>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-x-5 gap-y-3">
               <Checkbox
-                label="Close Upwork Tracker when automation stops"
+                label="Close Upwork"
+                tooltip={CLOSE_UPWORK_TOOLTIP}
                 checked={closeTracker}
-                onChange={(event) => setCloseTracker(event.target.checked)}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  setCloseTracker(event.target.checked)
+                }
                 disabled={controlsDisabled}
               />
               <Checkbox
-                label="Shut down system after automation ends"
+                label="Shutdown"
+                tooltip={SHUTDOWN_TOOLTIP}
                 checked={shutdownAfterStop}
-                onChange={(event) => setShutdownAfterStop(event.target.checked)}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  setShutdownAfterStop(event.target.checked)
+                }
                 disabled={controlsDisabled}
               />
             </div>
           </Card>
 
           {/* Controls */}
-          <Card>
+          <Card padding="sm">
             <SectionLabel>Controls</SectionLabel>
             {errorMessage && (
-              <Alert variant="error" title="Error" className="mb-4">
+              <Alert variant="error" title="Error" className="mb-3">
                 {errorMessage}
               </Alert>
             )}
-            <div className="flex gap-3">
+            <div className="grid grid-cols-2 gap-3 w-full">
               <Button
                 variant="primary"
-                className="flex-[2]"
+                size="sm"
+                fullWidth
+                className="w-full"
                 onClick={handleStartClick}
                 disabled={isActive}
               >
-                Start Automation
+                Start
               </Button>
               <Button
                 variant="secondary"
-                className="flex-1"
+                size="sm"
+                fullWidth
+                className="w-full"
                 onClick={handleStopClick}
                 disabled={!isActive}
               >
-                Stop Automation
+                Stop
               </Button>
             </div>
 
             {isRunning && (
-              <div className="mt-5 pt-5 border-t border-editorial-border grid grid-cols-2 gap-4">
-                <div>
+              <div className="mt-4 pt-4 border-t border-editorial-border grid grid-cols-2 gap-3">
+                <div className="min-w-0">
                   <p className="font-body text-[10px] font-bold uppercase tracking-label text-editorial-muted mb-1">
                     Running
                   </p>
-                  <p className="font-body text-lg text-editorial-text-primary">
+                  <p className="font-body text-sm sm:text-base text-editorial-text-primary truncate">
                     {formatDuration(elapsedSeconds)}
                   </p>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="font-body text-[10px] font-bold uppercase tracking-label text-editorial-muted mb-1">
-                    Time Remaining
+                    Remaining
                   </p>
-                  <p className="font-body text-lg text-editorial-text-primary">
+                  <p className="font-body text-sm sm:text-base text-editorial-text-primary truncate">
                     {remainingDisplay}
                   </p>
                 </div>
               </div>
             )}
           </Card>
-        </div>
 
-        {/* Right Column — Activity Log */}
-        <Card className="flex flex-col min-h-[320px] xl:min-h-0 xl:h-full overflow-hidden">
-          <div className="flex items-center justify-between mb-5">
-            <SectionLabel className="mb-0 border-0 pb-0 flex-1">Activity Log</SectionLabel>
-            <Button variant="ghost" size="sm" onClick={handleExportLog}>
-              Export Log
-            </Button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto border border-editorial-border rounded-editorial bg-editorial-base">
-            {logEntries.length === 0 ? (
-              <p className="p-4 font-body text-sm text-editorial-muted text-center">
-                No activity recorded yet.
-              </p>
-            ) : (
-              <ul className="divide-y divide-editorial-border">
-                {logEntries.map((entry) => (
-                  <li
-                    key={entry}
-                    className="px-4 py-3 font-body text-sm text-editorial-text-secondary hover:bg-editorial-secondary transition-colors duration-150"
+          {/* Activity Log — hidden by default */}
+          {showActivityLog && (
+            <Card className="flex flex-col min-h-[200px] max-h-[280px] overflow-hidden" padding="sm">
+              <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                <SectionLabel className="mb-0 border-0 pb-0 flex-1">Activity Log</SectionLabel>
+                <Tooltip content={EXPORT_LOG_TOOLTIP} maxWidth={220} placement="top">
+                  <button
+                    type="button"
+                    onClick={handleExportLog}
+                    aria-label="Export activity log"
+                    className={cn(
+                      'inline-flex items-center justify-center w-8 h-8 rounded-editorial',
+                      'text-editorial-muted hover:text-editorial-text-primary hover:bg-editorial-secondary',
+                      'transition-colors duration-150',
+                      'focus-visible:outline focus-visible:outline-2 focus-visible:outline-editorial-primary focus-visible:outline-offset-2',
+                    )}
                   >
-                    {entry}
-                  </li>
-                ))}
-              </ul>
-            )}
+                    <Download size={16} strokeWidth={2} />
+                  </button>
+                </Tooltip>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto border border-editorial-border rounded-editorial bg-editorial-base">
+                {logEntries.length === 0 ? (
+                  <p className="p-4 font-body text-sm text-editorial-muted text-center">
+                    No activity recorded yet.
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-editorial-border">
+                    {logEntries.map((entry) => (
+                      <li
+                        key={entry}
+                        className="px-3 py-2 font-body text-xs text-editorial-text-secondary hover:bg-editorial-secondary transition-colors duration-150"
+                      >
+                        {entry}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </Card>
+          )}
+        </main>
+
+        {/* Countdown Overlay — bottom-right, unobtrusive */}
+        {isCountdown && countdownSeconds !== null && (
+          <div
+            className="absolute bottom-3 right-4 font-body text-[10px] text-editorial-muted opacity-50 pointer-events-none select-none"
+            aria-live="polite"
+          >
+            Starting in {countdownSeconds}s
           </div>
-        </Card>
-      </main>
+        )}
 
-      {/* Countdown Overlay — bottom-right, unobtrusive */}
-      {isCountdown && countdownSeconds !== null && (
-        <div
-          className="fixed bottom-3 right-4 font-body text-[10px] text-editorial-muted opacity-50 pointer-events-none select-none"
-          aria-live="polite"
-        >
-          Starting in {countdownSeconds}s
-        </div>
-      )}
+        {/* Indefinite Timer Warning Modal */}
+        <Modal
+          isOpen={showIndefiniteModal}
+          onClose={() => setShowIndefiniteModal(false)}
+          eyebrow="Confirm Start"
+          title="Run Without Timer?"
+          description="No stop timer set. Automation will run indefinitely until manually stopped."
+          confirmLabel="Start Anyway"
+          cancelLabel="Go Back"
+          onConfirm={handleConfirmIndefinite}
+        />
 
-      {/* Indefinite Timer Warning Modal */}
-      <Modal
-        isOpen={showIndefiniteModal}
-        onClose={() => setShowIndefiniteModal(false)}
-        eyebrow="Confirm Start"
-        title="Run Without Timer?"
-        description="No stop timer set. Automation will run indefinitely until manually stopped."
-        confirmLabel="Start Anyway"
-        cancelLabel="Go Back"
-        onConfirm={handleConfirmIndefinite}
-      />
-
-      {/* Shutdown Countdown Modal */}
-      <Modal
-        isOpen={showShutdownModal}
-        onClose={handleCancelShutdown}
-        eyebrow="System Shutdown"
-        title="Shutting Down"
-        description={`System shutting down in ${shutdownCountdown} seconds...`}
-        confirmLabel="Cancel Shutdown"
-        cancelLabel="Dismiss"
-        onConfirm={handleCancelShutdown}
-        showActions
-      />
+        {/* Shutdown Countdown Modal */}
+        <Modal
+          isOpen={showShutdownModal}
+          onClose={handleCancelShutdown}
+          eyebrow="System Shutdown"
+          title="Shutting Down"
+          description={`System shutting down in ${shutdownCountdown} seconds...`}
+          confirmLabel="Cancel Shutdown"
+          cancelLabel="Dismiss"
+          onConfirm={handleCancelShutdown}
+          showActions
+        />
+      </div>
     </div>
   )
 }
