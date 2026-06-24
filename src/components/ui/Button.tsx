@@ -34,8 +34,8 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
 }
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {
-  sm: 'py-2 px-4 text-xs min-h-[34px]',
-  base: 'py-2.5 px-[22px] text-[13px] min-h-[40px]',
+  sm: 'py-2 px-3 sm:px-4 text-[11px] sm:text-xs min-h-[32px] sm:min-h-[34px]',
+  base: 'py-2 sm:py-2.5 px-4 sm:px-[22px] text-[11px] sm:text-[13px] min-h-[36px] sm:min-h-[40px]',
 }
 
 // ============================================================================
@@ -62,7 +62,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         type={type}
         disabled={disabled}
         className={cn(
-          'inline-flex items-center justify-center font-body font-semibold uppercase tracking-button',
+          'inline-flex items-center justify-center font-body font-semibold uppercase tracking-button whitespace-nowrap',
           'border-[1.5px] rounded-editorial cursor-pointer',
           'transition-[background-color,color,opacity,transform] duration-200 ease-out',
           'focus-visible:outline focus-visible:outline-2 focus-visible:outline-editorial-primary focus-visible:outline-offset-2',

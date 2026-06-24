@@ -10,7 +10,7 @@ import { cn } from '@/utils/cn'
 // ============================================================================
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  padding?: 'sm' | 'base'
+  padding?: 'xs' | 'sm' | 'base'
 }
 
 // ============================================================================
@@ -18,6 +18,7 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 // ============================================================================
 
 const PADDING_CLASSES = {
+  xs: 'p-1',
   sm: 'p-4',
   base: 'p-6',
 }

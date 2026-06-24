@@ -2,8 +2,11 @@
 // IMPORTS
 // ============================================================================
 
-import { type InputHTMLAttributes } from 'react'
+import { Check } from 'lucide-react'
+import { type InputHTMLAttributes, type ReactNode } from 'react'
 import { cn } from '@/utils/cn'
+import { InfoHint } from './InfoIcon'
+import Tooltip from './Tooltip'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -11,25 +14,35 @@ import { cn } from '@/utils/cn'
 
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
   label: string
+  tooltip?: ReactNode
 }
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-const Checkbox = ({ label, className, id, disabled, checked, onChange, ...props }: CheckboxProps) => {
+const Checkbox = ({
+  label,
+  tooltip,
+  className,
+  id,
+  disabled,
+  checked,
+  onChange,
+  ...props
+}: CheckboxProps) => {
   const inputId = id ?? `checkbox-${label.replace(/\s+/g, '-').toLowerCase()}`
 
   return (
     <label
       htmlFor={inputId}
       className={cn(
-        'inline-flex items-start gap-3 cursor-pointer group',
+        'inline-flex items-center gap-2 cursor-pointer group',
         disabled && 'opacity-40 cursor-not-allowed',
         className,
       )}
     >
-      <span className="relative flex-shrink-0 mt-0.5">
+      <span className="relative flex-shrink-0 inline-flex items-center">
         <input
           id={inputId}
           type="checkbox"
@@ -49,23 +62,27 @@ const Checkbox = ({ label, className, id, disabled, checked, onChange, ...props 
             'peer-disabled:bg-editorial-secondary',
           )}
         />
-        <svg
-          className="absolute top-0.5 left-0.5 w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none"
-          viewBox="0 0 12 12"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path
-            d="M2 6L5 9L10 3"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <Check
+          size={12}
+          strokeWidth={2.5}
+          className="absolute top-0.5 left-0.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none"
+          aria-hidden
+        />
       </span>
-      <span className="font-body text-sm text-editorial-text-secondary leading-snug select-none">
-        {label}
+      <span className="inline-flex items-center gap-1.5 min-w-0">
+        <span className="font-body text-xs font-semibold text-editorial-text-primary leading-none select-none">
+          {label}
+        </span>
+        {tooltip && (
+          <Tooltip content={tooltip} maxWidth={240}>
+            <span
+              className="inline-flex items-center justify-center flex-shrink-0 leading-none"
+              onClick={(event) => event.preventDefault()}
+            >
+              <InfoHint />
+            </span>
+          </Tooltip>
+        )}
       </span>
     </label>
   )
