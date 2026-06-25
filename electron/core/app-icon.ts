@@ -55,20 +55,38 @@ const buildIconCandidates = (): string[] => {
   }
 
   // Dev mode — project root resources/ (always populated by predev / generate:icons)
-  add(path.join(process.cwd(), 'resources', 'icon.ico'))
-  add(path.join(process.cwd(), 'resources', 'icon.png'))
+  if (preferIco) {
+    add(path.join(process.cwd(), 'resources', 'icon.ico'))
+    add(path.join(process.cwd(), 'resources', 'icon.png'))
+  } else {
+    add(path.join(process.cwd(), 'resources', 'icon.png'))
+    add(path.join(process.cwd(), 'resources', 'icon.ico'))
+  }
 
   // Vite build output copies icons here
-  add(path.join(__dirname, 'resources', 'icon.ico'))
-  add(path.join(__dirname, '../resources/icon.ico'))
-  add(path.join(__dirname, '../../resources/icon.ico'))
-  add(path.join(__dirname, 'resources', 'icon.png'))
-  add(path.join(__dirname, '../resources/icon.png'))
+  if (preferIco) {
+    add(path.join(__dirname, 'resources', 'icon.ico'))
+    add(path.join(__dirname, '../resources/icon.ico'))
+    add(path.join(__dirname, '../../resources/icon.ico'))
+    add(path.join(__dirname, 'resources', 'icon.png'))
+    add(path.join(__dirname, '../resources/icon.png'))
+  } else {
+    add(path.join(__dirname, 'resources', 'icon.png'))
+    add(path.join(__dirname, '../resources/icon.png'))
+    add(path.join(__dirname, 'resources', 'icon.ico'))
+    add(path.join(__dirname, '../resources/icon.ico'))
+    add(path.join(__dirname, '../../resources/icon.ico'))
+  }
 
   // Packaged app root (inside asar fallback)
   try {
-    add(path.join(app.getAppPath(), 'resources', 'icon.ico'))
-    add(path.join(app.getAppPath(), 'resources', 'icon.png'))
+    if (preferIco) {
+      add(path.join(app.getAppPath(), 'resources', 'icon.ico'))
+      add(path.join(app.getAppPath(), 'resources', 'icon.png'))
+    } else {
+      add(path.join(app.getAppPath(), 'resources', 'icon.png'))
+      add(path.join(app.getAppPath(), 'resources', 'icon.ico'))
+    }
   } catch {
     // app not ready yet — skip
   }
@@ -116,10 +134,12 @@ export function getAppIcon(): NativeImage {
 }
 
 /**
- * On Windows the taskbar button icon is most reliable when BrowserWindow
- * receives an absolute path to a .ico file (not a NativeImage object).
+ * Windows-only: absolute path to .ico for BrowserWindow taskbar icon.
+ * macOS/Linux must use PNG via getAppIcon() — .ico paths throw on setIcon.
  */
 export function getWindowsWindowIcon(): string | undefined {
+  if (process.platform !== 'win32') return undefined
+
   const iconPath = getAppIconPath()
   if (!iconPath) return undefined
   if (iconPath.endsWith('.ico')) return iconPath

@@ -7,6 +7,24 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.0.5] — 2026-06-25
+
+### Fixed
+
+- **macOS crash: `Failed to load image from path '.../icon.ico'`**
+  - `getWindowsWindowIcon()` was returning a `.ico` path on all platforms. On
+    macOS, `BrowserWindow.setIcon()` cannot load `.ico` files and threw an uncaught
+    exception in the `ready-to-show` handler.
+  - `getWindowsWindowIcon()` now returns a path **only on Windows** (`win32`).
+  - macOS/Linux use `icon.png` via `getAppIcon()` / `getAppIconPath()`.
+  - Added `setWindowIconSafe()` in `electron/main.ts` — wraps `setIcon()` in
+    try/catch and loads path strings via `nativeImage.createFromPath()` first.
+  - Icon candidate order on macOS now prefers `.png` before `.ico` in all search
+    paths (dev, packaged, and asar fallback).
+  - — `electron/core/app-icon.ts`, `electron/main.ts`
+
+---
+
 ## [1.0.4] — 2026-06-25
 
 ### Fixed

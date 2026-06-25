@@ -2,7 +2,8 @@
 // IMPORTS
 // ============================================================================
 
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, nativeImage } from 'electron'
+import type { NativeImage } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { getAppIcon, getAppIconPath, getWindowsWindowIcon } from './core/app-icon.js'
@@ -61,13 +62,29 @@ function applyAppIcon(): void {
   }
 }
 
+/** Apply window icon without crashing if the asset is missing or unsupported. */
+function setWindowIconSafe(win: BrowserWindow, icon: NativeImage | string): void {
+  try {
+    if (typeof icon === 'string') {
+      const image = nativeImage.createFromPath(icon)
+      if (image.isEmpty()) return
+      win.setIcon(image)
+      return
+    }
+    if (!icon.isEmpty()) {
+      win.setIcon(icon)
+    }
+  } catch {
+    // macOS cannot load .ico paths — ignore and keep the default window icon
+  }
+}
+
 function createWindow(): void {
   const appIcon = getAppIcon()
   const appIconPath = getAppIconPath()
   const windowsIconPath = getWindowsWindowIcon()
 
-  // Windows: pass absolute .ico path string — most reliable for taskbar icon.
-  // Other platforms: NativeImage or path fallback.
+  // Windows: absolute .ico path string. macOS/Linux: PNG path or NativeImage only.
   const windowIcon =
     process.platform === 'win32'
       ? windowsIconPath
@@ -99,19 +116,24 @@ function createWindow(): void {
     },
   })
 
-  if (!appIcon.isEmpty()) {
-    mainWindow.setIcon(appIcon)
-  } else if (windowsIconPath) {
-    mainWindow.setIcon(windowsIconPath)
+  if (process.platform === 'win32' && windowsIconPath) {
+    setWindowIconSafe(mainWindow, windowsIconPath)
+  } else if (!appIcon.isEmpty()) {
+    setWindowIconSafe(mainWindow, appIcon)
+  } else if (appIconPath) {
+    setWindowIconSafe(mainWindow, appIconPath)
   }
 
   mainWindow.once('ready-to-show', () => {
-    // Re-apply on show — Windows sometimes drops the icon set at construction
-    // when the window was created hidden (tray / --hidden startup).
-    if (windowsIconPath) {
-      mainWindow?.setIcon(windowsIconPath)
+    if (!mainWindow) return
+
+    // Re-apply on show — Windows sometimes drops the icon when started hidden.
+    if (process.platform === 'win32' && windowsIconPath) {
+      setWindowIconSafe(mainWindow, windowsIconPath)
     } else if (!appIcon.isEmpty()) {
-      mainWindow?.setIcon(appIcon)
+      setWindowIconSafe(mainWindow, appIcon)
+    } else if (appIconPath) {
+      setWindowIconSafe(mainWindow, appIconPath)
     }
   })
 
