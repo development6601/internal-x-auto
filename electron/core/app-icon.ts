@@ -14,19 +14,44 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-const ICON_CANDIDATES_WIN = [
-  path.join(__dirname, 'resources', 'icon.ico'),
-  path.join(__dirname, '../resources/icon.ico'),
-  path.join(__dirname, 'resources', 'icon.png'),
-  path.join(__dirname, '../resources/icon.png'),
-]
+// process.resourcesPath is the real filesystem path to the app's `resources/`
+// folder outside the asar archive — set by electron-builder for packaged apps.
+// Checking this first avoids loading the icon from inside the asar, which can
+// fail silently on Windows when used for taskbar/window icons.
+const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
 
-const ICON_CANDIDATES_DEFAULT = [
-  path.join(__dirname, 'resources', 'icon.png'),
-  path.join(__dirname, '../resources/icon.png'),
-  path.join(__dirname, 'resources', 'icon.ico'),
-  path.join(__dirname, '../resources/icon.ico'),
-]
+const buildIconCandidates = (preferIco: boolean): string[] => {
+  const candidates: string[] = []
+
+  // 1. Packaged app: real filesystem path outside asar (most reliable on Windows)
+  if (resourcesPath) {
+    if (preferIco) {
+      candidates.push(path.join(resourcesPath, 'resources', 'icon.ico'))
+      candidates.push(path.join(resourcesPath, 'resources', 'icon.png'))
+    } else {
+      candidates.push(path.join(resourcesPath, 'resources', 'icon.png'))
+      candidates.push(path.join(resourcesPath, 'resources', 'icon.ico'))
+    }
+  }
+
+  // 2. Relative to the bundled module inside the asar (dev + local builds)
+  if (preferIco) {
+    candidates.push(path.join(__dirname, 'resources', 'icon.ico'))
+    candidates.push(path.join(__dirname, '../resources/icon.ico'))
+    candidates.push(path.join(__dirname, 'resources', 'icon.png'))
+    candidates.push(path.join(__dirname, '../resources/icon.png'))
+  } else {
+    candidates.push(path.join(__dirname, 'resources', 'icon.png'))
+    candidates.push(path.join(__dirname, '../resources/icon.png'))
+    candidates.push(path.join(__dirname, 'resources', 'icon.ico'))
+    candidates.push(path.join(__dirname, '../resources/icon.ico'))
+  }
+
+  return candidates
+}
+
+const ICON_CANDIDATES_WIN     = buildIconCandidates(true)
+const ICON_CANDIDATES_DEFAULT = buildIconCandidates(false)
 
 // ============================================================================
 // STATE

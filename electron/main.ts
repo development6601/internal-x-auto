@@ -78,6 +78,11 @@ function createWindow(): void {
       // sandbox: false is required to allow ESM preload scripts.
       // contextIsolation remains true so contextBridge is enforced.
       sandbox: false,
+      // Prevent Chromium from throttling timers when the window is hidden
+      // to the system tray. Without this, setInterval fires at ~3-5x slower
+      // than the requested 1 s interval, causing the elapsed/remaining timers
+      // in the renderer to fall far behind real wall-clock time.
+      backgroundThrottling: false,
     },
   })
 
