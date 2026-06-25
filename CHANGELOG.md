@@ -7,6 +7,23 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.0.6] — 2026-06-25
+
+### Fixed
+
+- **Post-Stop Options not visible during an active run**
+  - Close Upwork and Shutdown checkboxes were `disabled` while automation was
+    running, which faded them to 40% opacity and made checked choices hard to see.
+  - Post-stop options are now **read-only** during countdown and running states:
+    checked values stay fully visible, but cannot be changed mid-run.
+  - Choices are **snapshotted when Start is pressed** (`lockedPostStopOptions`)
+    so the UI always reflects what will run on stop, not stale toggle state.
+  - A small **"Locked for this run"** label appears in the Post-Stop Options
+    section while automation is active.
+  - — `src/components/ui/Checkbox.tsx` (`readOnly` prop); `src/App.tsx`
+
+---
+
 ## [1.0.5] — 2026-06-25
 
 ### Fixed

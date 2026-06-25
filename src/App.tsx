@@ -124,6 +124,12 @@ const App = () => {
   const [closeTracker, setCloseTracker] = useState(false)
   const [shutdownAfterStop, setShutdownAfterStop] = useState(false)
 
+  /** Post-stop choices locked when a run starts — shown read-only while active. */
+  const [lockedPostStopOptions, setLockedPostStopOptions] = useState<{
+    closeTracker: boolean
+    shutdown: boolean
+  } | null>(null)
+
   // ============================================================================
   // STATE - UI Control
   // ============================================================================
@@ -232,17 +238,26 @@ const App = () => {
     return formatDuration(remainingSeconds)
   }, [isRunning, hasNoTimer, remainingSeconds])
 
+  const displayCloseTracker = lockedPostStopOptions?.closeTracker ?? closeTracker
+  const displayShutdownAfterStop = lockedPostStopOptions?.shutdown ?? shutdownAfterStop
+
   // ============================================================================
   // FUNCTIONS - Event Handlers
   // ============================================================================
   const beginCountdown = useCallback(() => {
+    const postStopSnapshot = {
+      closeTracker,
+      shutdown: shutdownAfterStop,
+    }
+
     // Capture the current config so the countdown effect can read it safely
     startPayloadRef.current = {
       mode,
       durationSeconds: totalTimerSeconds,
-      closeTracker,
-      shutdown: shutdownAfterStop,
+      closeTracker: postStopSnapshot.closeTracker,
+      shutdown: postStopSnapshot.shutdown,
     }
+    setLockedPostStopOptions(postStopSnapshot)
     setErrorMessage(null)
     setStatus('countdown')
     setCountdownSeconds(START_COUNTDOWN_SECONDS)
@@ -284,6 +299,7 @@ const App = () => {
     setStatus('stopped')
     setCountdownSeconds(null)
     setRemainingSeconds(null)
+    setLockedPostStopOptions(null)
 
     if (shutdownAfterStop) {
       setShutdownCountdown(30)
@@ -389,6 +405,7 @@ const App = () => {
       announceStopped()
       setStatus('stopped')
       setCountdownSeconds(null)
+      setLockedPostStopOptions(null)
       if (shutdownAfterStop) {
         setShutdownCountdown(30)
         setShowShutdownModal(true)
@@ -580,25 +597,29 @@ const App = () => {
 
           {/* Options */}
           <Card padding="sm">
-            <SectionLabel>Post-Stop Options</SectionLabel>
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <SectionLabel bordered={false} className="mb-0 pb-0">
+                Post-Stop Options
+              </SectionLabel>
+            </div>
             <div className="flex flex-wrap gap-x-5 gap-y-3">
               <Checkbox
                 label="Close Upwork"
                 tooltip={CLOSE_UPWORK_TOOLTIP}
-                checked={closeTracker}
+                checked={displayCloseTracker}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   setCloseTracker(event.target.checked)
                 }
-                disabled={controlsDisabled}
+                readOnly={isActive}
               />
               <Checkbox
                 label="Shutdown"
                 tooltip={SHUTDOWN_TOOLTIP}
-                checked={shutdownAfterStop}
+                checked={displayShutdownAfterStop}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   setShutdownAfterStop(event.target.checked)
                 }
-                disabled={controlsDisabled}
+                readOnly={isActive}
               />
             </div>
           </Card>

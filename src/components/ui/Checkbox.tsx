@@ -15,6 +15,8 @@ import Tooltip from './Tooltip'
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
   label: string
   tooltip?: ReactNode
+  /** Shows checked state clearly but prevents changes (e.g. during an active run). */
+  readOnly?: boolean
 }
 
 // ============================================================================
@@ -27,18 +29,21 @@ const Checkbox = ({
   className,
   id,
   disabled,
+  readOnly,
   checked,
   onChange,
   ...props
 }: CheckboxProps) => {
   const inputId = id ?? `checkbox-${label.replace(/\s+/g, '-').toLowerCase()}`
+  const isLocked = readOnly === true
 
   return (
     <label
       htmlFor={inputId}
       className={cn(
-        'inline-flex items-center gap-2 cursor-pointer group',
-        disabled && 'opacity-40 cursor-not-allowed',
+        'inline-flex items-center gap-2 group',
+        isLocked ? 'cursor-default' : 'cursor-pointer',
+        disabled && !isLocked && 'opacity-40 cursor-not-allowed',
         className,
       )}
     >
@@ -47,8 +52,10 @@ const Checkbox = ({
           id={inputId}
           type="checkbox"
           checked={checked}
-          onChange={onChange}
-          disabled={disabled}
+          onChange={isLocked ? undefined : onChange}
+          disabled={disabled && !isLocked}
+          readOnly={isLocked}
+          tabIndex={isLocked ? -1 : undefined}
           className="peer sr-only"
           {...props}
         />
@@ -58,8 +65,8 @@ const Checkbox = ({
             'bg-editorial-surface transition-all duration-200',
             'peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-editorial-primary peer-focus-visible:outline-offset-2',
             'peer-checked:bg-editorial-primary peer-checked:border-editorial-primary',
-            'group-hover:border-[#c8b8a8]',
-            'peer-disabled:bg-editorial-secondary',
+            !isLocked && 'group-hover:border-[#c8b8a8]',
+            disabled && !isLocked && 'peer-disabled:bg-editorial-secondary',
           )}
         />
         <Check
