@@ -19,6 +19,40 @@ import sys
 import time
 from typing import Callable, List
 
+# ── macOS: suppress Dock icon BEFORE pyautogui import ────────────────────────
+# pyautogui on macOS triggers creation of an NSApplication instance via
+# the Quartz/pyobjc bridge.  Once NSApplication is live it shows the Python
+# rocket icon in the Dock by default.  Setting the activation policy to
+# NSApplicationActivationPolicyProhibited (2) before the import hides it.
+
+if sys.platform == 'darwin':
+    try:
+        import ctypes
+        import ctypes.util
+
+        _libobjc = ctypes.cdll.LoadLibrary('/usr/lib/libobjc.dylib')
+        _libobjc.objc_getClass.restype       = ctypes.c_void_p
+        _libobjc.sel_registerName.restype    = ctypes.c_void_p
+        _libobjc.objc_msgSend.restype        = ctypes.c_void_p
+        _libobjc.objc_msgSend.argtypes       = [ctypes.c_void_p, ctypes.c_void_p]
+
+        # Build a variant of objc_msgSend that accepts a long (NSInteger) arg
+        _msgSend_long = ctypes.CFUNCTYPE(
+            ctypes.c_void_p,    # return
+            ctypes.c_void_p,    # self
+            ctypes.c_void_p,    # SEL
+            ctypes.c_long,      # NSApplicationActivationPolicy
+        )(_libobjc.objc_msgSend)
+
+        _NSApp_class       = _libobjc.objc_getClass(b'NSApplication')
+        _sharedApplication = _libobjc.sel_registerName(b'sharedApplication')
+        _setPolicy         = _libobjc.sel_registerName(b'setActivationPolicy:')
+
+        _nsapp = _libobjc.objc_msgSend(_NSApp_class, _sharedApplication)
+        _msgSend_long(_nsapp, _setPolicy, 2)   # 2 = NSApplicationActivationPolicyProhibited
+    except Exception:
+        pass   # Non-fatal — Dock icon may appear but automation still works
+
 import pyautogui
 
 # Disable the corner-of-screen failsafe — Electron owns the stop signal
@@ -28,20 +62,31 @@ pyautogui.FAILSAFE = False
 # Keeps SIGTERM response latency under ~50 ms.
 POLL_INTERVAL: float = 0.05
 
-# Platform flag — resolved once at import time.
-_IS_MACOS: bool = sys.platform == 'darwin'
+# Platform flags — resolved once at import time.
+_IS_MACOS:   bool = sys.platform == 'darwin'
 _IS_WINDOWS: bool = sys.platform == 'win32'
 
 
 # ── Individual actions ────────────────────────────────────────────────────────
 
-def action_ctrl_tab() -> None:
-    """Switch browser tab or editor file.
+def action_ctrl_tab_multi() -> None:
+    """Hold Ctrl and press Tab 1–5 times to cycle through multiple tabs/files.
 
-    Ctrl+Tab works on both Windows and macOS inside Chrome, Firefox,
-    Cursor, VSCode, and most Electron apps.
+    Pressing Tab multiple times with Ctrl held advances through several
+    open tabs or editor files in one action — avoiding the back-and-forth
+    between only two files that a single Ctrl+Tab produces.
+
+    Works on both Windows and macOS (Chrome, Firefox, Cursor, VS Code).
     """
-    pyautogui.hotkey('ctrl', 'tab')
+    count = random.randint(1, 5)
+    try:
+        pyautogui.keyDown('ctrl')
+        for i in range(count):
+            pyautogui.press('tab')
+            if i < count - 1:
+                time.sleep(random.uniform(0.05, 0.18))
+    finally:
+        pyautogui.keyUp('ctrl')
 
 
 def action_scroll_up() -> None:
@@ -79,22 +124,51 @@ def action_arrow_sequence() -> None:
 
 
 def action_app_switch() -> None:
-    """Switch the active application window.  Advanced mode only.
+    """Switch to the most-recently-used (MRU) previous application.
 
-    - Windows / Linux : Alt+Tab
-    - macOS           : Cmd+Tab  (pyautogui key name: 'command')
+    Presses the modifier (Alt/Cmd) down, taps Tab once, then immediately
+    releases the modifier.  Releasing before the OS timeout means the
+    app-switcher overlay is never shown — the focus jumps straight to the
+    LAST used app, not an arbitrary position in the switcher list.
+
+    Effect in practice
+    ------------------
+    Because each call flips to the single previous app and nothing else,
+    repeated calls produce an exact back-and-forth between exactly two
+    apps (e.g. VS Code ↔ Chrome).  Any other open app (e.g. Spotify)
+    stays in the background as long as the user ensures VS Code and
+    Chrome are the two most-recently-focused apps before starting.
+
+    Platform
+    --------
+    - Windows / Linux : Alt   + Tab (one tap)
+    - macOS           : Cmd   + Tab (one tap)
     """
-    if _IS_MACOS:
-        pyautogui.hotkey('command', 'tab')
-    else:
-        pyautogui.hotkey('alt', 'tab')
+    try:
+        if _IS_MACOS:
+            pyautogui.keyDown('command')
+            pyautogui.press('tab')
+            pyautogui.keyUp('command')
+        else:
+            pyautogui.keyDown('alt')
+            pyautogui.press('tab')
+            pyautogui.keyUp('alt')
+    finally:
+        # Give the OS window manager time to complete the focus transfer
+        # before the next action fires.  Without this, a fast-following
+        # Ctrl+Tab could land in the wrong window.
+        time.sleep(0.35)
 
 
 # ── Action pools ──────────────────────────────────────────────────────────────
 
-#: Actions available in Basic mode — no application switching
+#: Actions available in Basic mode — tab/file cycling only, no app switching.
+#: action_ctrl_tab_multi appears 4× to make tab cycling the dominant action.
 BASIC_POOL: List[Callable[[], None]] = [
-    action_ctrl_tab,
+    action_ctrl_tab_multi,
+    action_ctrl_tab_multi,  # weighted: tab cycling is the primary activity
+    action_ctrl_tab_multi,
+    action_ctrl_tab_multi,
     action_scroll_up,
     action_scroll_up,       # weighted: scrolling is common
     action_scroll_down,
@@ -107,11 +181,12 @@ BASIC_POOL: List[Callable[[], None]] = [
     action_arrow_sequence,  # weighted: sequences look natural
 ]
 
-#: Actions available in Advanced mode — everything + application switching
+#: Advanced pool = everything in Basic + app switching.
+#: action_app_switch appears once so it is roughly 1-in-15 (~7 %) of actions,
+#: keeping tab/file cycling dominant and app switching occasional.
 #: Uses Alt+Tab on Windows/Linux, Cmd+Tab on macOS.
 ADVANCED_POOL: List[Callable[[], None]] = BASIC_POOL + [
     action_app_switch,
-    action_app_switch,      # weighted: app switching is prominent
 ]
 
 
