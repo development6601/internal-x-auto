@@ -13,6 +13,15 @@ export default defineConfig({
       },
       {
         entry: 'electron/preload.ts',
+        vite: {
+          build: {
+            rollupOptions: {
+              output: {
+                entryFileNames: '[name].mjs',
+              },
+            },
+          },
+        },
         onstart(args) {
           args.reload()
         },
