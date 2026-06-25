@@ -2,7 +2,7 @@
 // IMPORTS
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, ScrollText } from 'lucide-react'
 import {
   Alert,
@@ -26,6 +26,9 @@ import {
 import type { AutomationMode, AutomationStatus } from '@/types/automation.types'
 import { cn } from '@/utils/cn'
 import { formatDuration, parseTimerInput, timerToSeconds } from '@/utils/format'
+import useAutomation from '@/hooks/useAutomation'
+import useActivityLog from '@/hooks/useActivityLog'
+import useVoice from '@/hooks/useVoice'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -100,14 +103,6 @@ const EXPORT_LOG_TOOLTIP = (
   </>
 )
 
-const MOCK_LOG_ENTRIES = [
-  '[2026-06-24 09:14:22] STOPPED (manual) — Ran for: 01:12:43',
-  '[2026-06-24 08:01:39] STARTED — Mode: Advanced, Timer: 4h 30m, Close Tracker: Yes, Shutdown: No',
-  '[2026-06-23 17:45:01] STOPPED (timer elapsed) — Ran for: 04:30:00',
-  '[2026-06-23 13:14:58] STARTED — Mode: Basic, Timer: 4h 30m, Close Tracker: No, Shutdown: No',
-  '[2026-06-23 11:02:15] Upwork tracker closed successfully',
-]
-
 const START_COUNTDOWN_SECONDS = 10
 
 // ============================================================================
@@ -135,11 +130,19 @@ const App = () => {
   const [timerMinutes, setTimerMinutes] = useState('0')
   const [closeTracker, setCloseTracker] = useState(false)
   const [shutdownAfterStop, setShutdownAfterStop] = useState(false)
-  const [logEntries] = useState<string[]>(MOCK_LOG_ENTRIES)
 
   // ============================================================================
   // STATE - UI Control
   // ============================================================================
+
+  /** Captures start payload at countdown-begin time so the effect can use it safely. */
+  const startPayloadRef = useRef<{
+    mode: AutomationMode
+    durationSeconds: number
+    closeTracker: boolean
+    shutdown: boolean
+  } | null>(null)
+
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null)
@@ -148,6 +151,33 @@ const App = () => {
   const [shutdownCountdown, setShutdownCountdown] = useState(30)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showActivityLog, setShowActivityLog] = useState(false)
+
+  // ============================================================================
+  // CUSTOM HOOKS - IPC Bridge
+  // ============================================================================
+
+  const handleIpcStatus = useCallback((ipcStatus: 'running' | 'stopped' | 'error') => {
+    setStatus((prev) => {
+      if (ipcStatus === 'running') return 'running'
+      if (ipcStatus === 'error') return 'error'
+      // 'stopped' from IPC: only update if we're not already stopped
+      if (ipcStatus === 'stopped' && prev !== 'stopped') return 'stopped'
+      return prev
+    })
+  }, [])
+
+  const handleIpcError = useCallback((message: string) => {
+    setErrorMessage(message)
+  }, [])
+
+  const { start: automationStart, stop: automationStop } = useAutomation({
+    onStatus: handleIpcStatus,
+    onError: handleIpcError,
+  })
+
+  const { entries: logEntries, exportLog } = useActivityLog()
+
+  const { announceCountdownStart, announceStarted, announceStopped, announceShutdown } = useVoice()
 
   // ============================================================================
   // COMPUTED VALUES
@@ -180,12 +210,20 @@ const App = () => {
   // FUNCTIONS - Event Handlers
   // ============================================================================
   const beginCountdown = useCallback(() => {
+    // Capture the current config so the countdown effect can read it safely
+    startPayloadRef.current = {
+      mode,
+      durationSeconds: totalTimerSeconds,
+      closeTracker,
+      shutdown: shutdownAfterStop,
+    }
     setErrorMessage(null)
     setStatus('countdown')
     setCountdownSeconds(START_COUNTDOWN_SECONDS)
     setElapsedSeconds(0)
     setRemainingSeconds(hasNoTimer ? null : totalTimerSeconds)
-  }, [hasNoTimer, totalTimerSeconds])
+    announceCountdownStart()
+  }, [mode, totalTimerSeconds, closeTracker, shutdownAfterStop, hasNoTimer, announceCountdownStart])
 
   const handleStartClick = useCallback(() => {
     if (isActive) return
@@ -206,6 +244,12 @@ const App = () => {
   const handleStopClick = useCallback(() => {
     if (!isActive) return
 
+    // Only send IPC stop if Python was actually started
+    if (isRunning) {
+      automationStop({ reason: 'manual', elapsedSeconds })
+    }
+
+    announceStopped()
     setStatus('stopped')
     setCountdownSeconds(null)
     setRemainingSeconds(null)
@@ -213,17 +257,18 @@ const App = () => {
     if (shutdownAfterStop) {
       setShutdownCountdown(30)
       setShowShutdownModal(true)
+      announceShutdown()
     }
-  }, [isActive, shutdownAfterStop])
+  }, [isActive, isRunning, elapsedSeconds, shutdownAfterStop, automationStop, announceStopped, announceShutdown])
 
   const handleCancelShutdown = useCallback(() => {
     setShowShutdownModal(false)
     setShutdownCountdown(30)
   }, [])
 
-  const handleExportLog = useCallback(() => {
-    // IPC integration will be added in a later phase
-  }, [])
+  const handleExportLog = useCallback(async () => {
+    await exportLog()
+  }, [exportLog])
 
   const handleToggleActivityLog = useCallback(() => {
     setShowActivityLog((prev) => !prev)
@@ -236,8 +281,13 @@ const App = () => {
     if (!isCountdown || countdownSeconds === null) return
 
     if (countdownSeconds <= 0) {
-      setStatus('running')
+      // Spawn the Python script via Electron IPC
+      if (startPayloadRef.current) {
+        automationStart(startPayloadRef.current)
+      }
+      setStatus('running') // Optimistic — confirmed via IPC onStatus callback
       setCountdownSeconds(null)
+      announceStarted()
       return
     }
 
@@ -246,7 +296,7 @@ const App = () => {
     }, 1000)
 
     return () => window.clearTimeout(timerId)
-  }, [isCountdown, countdownSeconds])
+  }, [isCountdown, countdownSeconds, automationStart, announceStarted])
 
   // ============================================================================
   // EFFECTS - Running Timers
@@ -269,14 +319,17 @@ const App = () => {
 
   useEffect(() => {
     if (isRunning && !hasNoTimer && remainingSeconds === 0) {
+      automationStop({ reason: 'timer', elapsedSeconds })
+      announceStopped()
       setStatus('stopped')
       setCountdownSeconds(null)
       if (shutdownAfterStop) {
         setShutdownCountdown(30)
         setShowShutdownModal(true)
+        announceShutdown()
       }
     }
-  }, [isRunning, hasNoTimer, remainingSeconds, shutdownAfterStop])
+  }, [isRunning, hasNoTimer, remainingSeconds, shutdownAfterStop, elapsedSeconds, automationStop, announceStopped, announceShutdown])
 
   // ============================================================================
   // EFFECTS - Shutdown Countdown
@@ -297,6 +350,40 @@ const App = () => {
   }, [showShutdownModal, shutdownCountdown])
 
   // ============================================================================
+  // EFFECTS - Tray IPC subscriptions
+  // We use refs to avoid re-subscribing every time the callbacks change.
+  // The refs always point to the latest handler without the effect re-running.
+  // ============================================================================
+  const handleStartClickRef = useRef(handleStartClick)
+  const handleStopClickRef = useRef(handleStopClick)
+
+  useEffect(() => { handleStartClickRef.current = handleStartClick }, [handleStartClick])
+  useEffect(() => { handleStopClickRef.current = handleStopClick }, [handleStopClick])
+
+  useEffect(() => {
+    if (!window.electronAPI?.tray) return
+
+    const unsubStart = window.electronAPI.tray.onRequestStart(() => {
+      handleStartClickRef.current()
+    })
+    const unsubStop = window.electronAPI.tray.onRequestStop(() => {
+      handleStopClickRef.current()
+    })
+
+    return () => {
+      unsubStart()
+      unsubStop()
+    }
+  }, []) // stable — subscribes once, uses refs for latest handlers
+
+  // ============================================================================
+  // EFFECTS - Mode sync to tray
+  // ============================================================================
+  useEffect(() => {
+    window.electronAPI?.tray?.notifyModeChanged(mode)
+  }, [mode])
+
+  // ============================================================================
   // RENDER - Main Component
   // ============================================================================
   return (
@@ -308,7 +395,7 @@ const App = () => {
         {/* Header */}
         <header className="relative z-20 flex-shrink-0 border-b border-editorial-border bg-editorial-base px-4 sm:px-5 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="font-display text-[23px] sm:text-[29px] font-extralight text-editorial-text-primary leading-none truncate">
+            <h1 className="font-display  text-2xl sm:text-4xl font-light text-editorial-text-primary leading-none truncate">
               {APP_NAME}
             </h1>
 
@@ -477,7 +564,9 @@ const App = () => {
           {showActivityLog && (
             <Card className="flex flex-col min-h-[200px] max-h-[280px] overflow-hidden" padding="sm">
               <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                <SectionLabel className="mb-0 border-0 pb-0 flex-1">Activity Log</SectionLabel>
+                <SectionLabel className="mb-0 border-0 pb-0 flex-1 text-xs font-extrabold">
+                  Activity Log
+                </SectionLabel>
                 <Tooltip content={EXPORT_LOG_TOOLTIP} maxWidth={220} placement="top">
                   <button
                     type="button"

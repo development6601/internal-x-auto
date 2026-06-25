@@ -18,7 +18,7 @@ export interface SectionLabelProps extends HTMLAttributes<HTMLDivElement> {
 // ============================================================================
 
 export const SECTION_TITLE_CLASS =
-  'font-body text-xs font-extrabold uppercase tracking-eyebrow text-editorial-muted'
+  'font-body text-[11px] font-bold uppercase tracking-eyebrow text-editorial-muted'
 
 // ============================================================================
 // MAIN COMPONENT
