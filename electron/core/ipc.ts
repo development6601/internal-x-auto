@@ -90,7 +90,13 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
       updateTrayStatus(status === 'running')
     }
 
-    startAutomation(payload, onStatus, send.logEntry)
+    void startAutomation(payload, onStatus, send.logEntry).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err)
+      devLog('ERROR', `startAutomation() failed: ${message}`)
+      send.error(message)
+      send.status('error')
+      updateTrayStatus(false)
+    })
   })
 
   // ── automation:stop ───────────────────────────────────────────────────────
