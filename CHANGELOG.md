@@ -2,6 +2,74 @@
 
 All notable changes to **InternalX** are documented here.
 
+---
+
+## [1.0.3] — 2026-06-25
+
+### Fixed
+
+- **App switching now goes strictly to the last used app (2-app back-and-forth)**
+  `action_app_switch()` previously used `pyautogui.hotkey(...)` which chains
+  keyDown+keyUp in a single call and may leave the modifier held a fraction too
+  long on some systems, risking the OS showing the persistent app-switcher overlay
+  and landing on a third app. It now uses an explicit `keyDown` → `press('tab')` →
+  `keyUp` sequence so the modifier is always released immediately after the single
+  Tab tap. This guarantees the OS switches directly to the **most-recently-used
+  previous app** without opening the switcher list — creating a clean VS Code ↔
+  Chrome back-and-forth. A 350 ms settle pause is inserted after each switch so
+  the window manager fully transfers focus before the next action fires.
+  — `scripts/lib/actions.py`: `action_app_switch()`.
+
+---
+
+## [1.0.2] — 2026-06-25
+
+### Fixed
+
+- **Windows taskbar icon showing Electron** — `signAndEditExecutable: false` was
+  preventing electron-builder's rcedit step from embedding the InternalX icon into
+  the EXE. A new `electron/afterpack.cjs` hook now runs `rcedit` directly after
+  packaging to set the icon, product name, and version metadata on the EXE.
+  Additionally, `resources/icon.ico` and `icon.png` are now copied outside the
+  asar archive via `extraResources` so `mainWindow.setIcon()` loads from the real
+  filesystem (more reliable on Windows than loading from inside the asar).
+  — `electron/afterpack.cjs` (new); `electron/core/app-icon.ts` checks
+  `process.resourcesPath` first; `package.json` build config updated.
+
+- **Timer far behind real time when window is hidden to tray** — Chromium
+  aggressively throttles `setInterval` in hidden windows, causing the displayed
+  elapsed/remaining time to fall ~3× behind wall-clock time. Two complementary
+  fixes: (1) `backgroundThrottling: false` in `BrowserWindow` webPreferences
+  disables Chromium's background timer throttling entirely; (2) the running-timer
+  effect in the renderer now anchors elapsed/remaining to `Date.now()` instead of
+  counting ticks, so the displayed time is always accurate even if an interval
+  fires late.
+  — `electron/main.ts`; `src/App.tsx` (running timer effect + new refs
+  `runStartTimeRef`, `runTotalSecondsRef`).
+
+- **Ctrl+Tab spinning between only two files** — The tab-cycling action previously
+  sent a single `Ctrl+Tab` press, causing VS Code / Chrome to flip between exactly
+  two files/tabs. It now holds Ctrl and presses Tab **1–5 times** (random), so
+  each action cycles through a variable number of open files or browser tabs before
+  releasing Ctrl. The `BASIC_POOL` weights also increase tab-cycling frequency
+  (4× weight vs. 1× before).
+  — `scripts/lib/actions.py`: `action_ctrl_tab()` → `action_ctrl_tab_multi()`.
+
+- **Advanced mode app switching too frequent** — `action_app_switch` appeared
+  twice in `ADVANCED_POOL` (≈17% of actions). It now appears once (≈7%), making
+  tab/file cycling the dominant activity and application switching occasional.
+  — `scripts/lib/actions.py`.
+
+- **macOS: Python rocket icon appearing in Dock** — `pyautogui` imports
+  Quartz/pyobjc, which creates an `NSApplication` instance and shows the Python
+  icon in the Dock. The fix calls `[NSApp setActivationPolicy: NSApplicationActivationPolicyProhibited]`
+  via `ctypes` **before** `import pyautogui`, suppressing the Dock entry.
+  — `scripts/lib/actions.py`.
+
+---
+
+All notable changes to **InternalX** are documented here.
+
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 

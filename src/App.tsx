@@ -136,6 +136,15 @@ const App = () => {
     shutdown: boolean
   } | null>(null)
 
+  /**
+   * Wall-clock timestamp (ms) when the automation transitioned to 'running'.
+   * Used to compute elapsed/remaining from real time instead of counting
+   * setInterval ticks, which Chromium throttles when the window is hidden.
+   */
+  const runStartTimeRef   = useRef<number | null>(null)
+  /** Total duration (seconds) captured when automation starts. */
+  const runTotalSecondsRef = useRef<number>(0)
+
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null)
@@ -349,20 +358,30 @@ const App = () => {
   // EFFECTS - Running Timers
   // ============================================================================
   useEffect(() => {
-    if (!isRunning) return
+    if (!isRunning) {
+      runStartTimeRef.current = null
+      return
+    }
 
-    const timerId = window.setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1)
+    // Anchor elapsed to wall-clock time so the timer stays accurate even
+    // when the window is hidden to tray and Chromium throttles setInterval.
+    runStartTimeRef.current   = Date.now()
+    runTotalSecondsRef.current = totalTimerSeconds
+
+    const update = () => {
+      if (!runStartTimeRef.current) return
+      const elapsed = Math.floor((Date.now() - runStartTimeRef.current) / 1000)
+      setElapsedSeconds(elapsed)
       if (!hasNoTimer) {
-        setRemainingSeconds((prev) => {
-          if (prev === null || prev <= 1) return 0
-          return prev - 1
-        })
+        setRemainingSeconds(Math.max(0, runTotalSecondsRef.current - elapsed))
       }
-    }, 1000)
+    }
 
+    // Poll at 500 ms — still resolves to whole-second values but catches
+    // the exact expiry moment within half a second even if throttled to 1 Hz.
+    const timerId = window.setInterval(update, 500)
     return () => window.clearInterval(timerId)
-  }, [isRunning, hasNoTimer])
+  }, [isRunning, hasNoTimer, totalTimerSeconds])
 
   useEffect(() => {
     if (isRunning && !hasNoTimer && remainingSeconds === 0) {
