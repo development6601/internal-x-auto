@@ -15,7 +15,6 @@ export type StopReason = 'manual' | 'timer'
 export interface StartPayload {
   mode: AutomationMode
   durationSeconds: number
-  closeTracker: boolean
   shutdown: boolean
 }
 
@@ -68,7 +67,8 @@ export const IPC_CHANNELS = {
   PREREQUISITES_CHECK: 'prerequisites:check',
   PREREQUISITES_INSTALL: 'prerequisites:install',
   APP_MODE_CHANGED: 'app:mode-changed',
-  POST_STOP_SHUTDOWN: 'post-stop:shutdown', // Renderer asks Main to execute OS shutdown
+  POST_STOP_SHUTDOWN: 'post-stop:shutdown',       // Renderer asks Main to execute OS shutdown
+  POST_STOP_SCREEN_LOCK: 'post-stop:screen-lock', // Renderer asks Main to lock the screen
   // Main → Renderer
   AUTOMATION_STATUS: 'automation:status',
   AUTOMATION_ERROR: 'automation:error',
@@ -77,4 +77,8 @@ export const IPC_CHANNELS = {
   DEV_LOG_NEW_ENTRY: 'dev-log:new-entry',     // Main pushes live dev log entries
   TRAY_REQUEST_START: 'tray:request-start',
   TRAY_REQUEST_STOP: 'tray:request-stop',
+  TRAY_REQUEST_START_PRESET: 'tray:request-start-preset',          // Main → Renderer: start with N hours
+  TRAY_SET_SCREEN_LOCK: 'tray:set-screen-lock',                    // Main → Renderer: toggle screen lock pref
+  TRAY_SET_SHUTDOWN: 'tray:set-shutdown',                          // Main → Renderer: toggle shutdown pref
+  TRAY_POST_STOP_OPTIONS_CHANGED: 'tray:post-stop-options-changed', // Renderer → Main: sync pref changes
 } as const

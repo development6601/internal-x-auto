@@ -8,9 +8,9 @@ import fs from 'fs'
 import { startAutomation, stopAutomation, isRunning } from './automation.js'
 import { devLog, getDevLogEntries, setDevLogRenderer } from './dev-logger.js'
 import { writeLog, readLog } from './logger.js'
-import { closeUpworkTracker, executeSystemShutdown } from './post-stop.js'
+import { executeScreenLock, executeSystemShutdown } from './post-stop.js'
 import { checkPythonPrerequisites, installPythonPrerequisites } from './python-deps.js'
-import { updateTrayMode, updateTrayStatus } from './tray.js'
+import { updateTrayMode, updateTrayPostStopOptions, updateTrayStatus } from './tray.js'
 import { IPC_CHANNELS } from './types.js'
 import type { StartPayload, StopPayload, AutomationStatus } from './types.js'
 import { formatDuration } from './utils.js'
@@ -24,9 +24,6 @@ const LOG_FILE_FILTERS = [{ name: 'Log Files', extensions: ['log', 'txt'] }]
 // ============================================================================
 // STATE
 // ============================================================================
-
-// Persisted from the last start payload so post-stop actions know what to run.
-let _closeTracker = false
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -75,9 +72,6 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
       devLog('WARN', 'IPC: AUTOMATION_START ignored — already running')
       return
     }
-
-    // Store post-stop config for use when automation eventually stops
-    _closeTracker = payload.closeTracker
 
     const send = buildSender(getWindow)
     // Update tray immediately so the icon reflects the new state without
@@ -128,22 +122,22 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     send.logEntry(stopEntry)
     send.status('stopped')
     updateTrayStatus(false)
-
-    // ── Post-stop: Close Upwork tracker (F4) ─────────────────────────────────
-    // Runs after Python exits, before shutdown. Upwork close is near-instant
-    // so it completes well within the 30s shutdown countdown window in the UI.
-    if (_closeTracker) {
-      closeUpworkTracker(send.logEntry)
-      _closeTracker = false
-    }
   })
 
   // ── post-stop:shutdown ────────────────────────────────────────────────────
   // Triggered by the renderer after the 30-second shutdown countdown elapses
-  // without user cancellation (F5).
+  // without user cancellation.
   ipcMain.on(IPC_CHANNELS.POST_STOP_SHUTDOWN, () => {
     const send = buildSender(getWindow)
     executeSystemShutdown(send.logEntry)
+  })
+
+  // ── post-stop:screen-lock ─────────────────────────────────────────────────
+  // Triggered by the renderer when the Screen Lock post-stop option is active.
+  // Called immediately on stop (standalone) or just before shutdown (combined).
+  ipcMain.on(IPC_CHANNELS.POST_STOP_SCREEN_LOCK, () => {
+    const send = buildSender(getWindow)
+    executeScreenLock(send.logEntry)
   })
 
   // ── log:get-entries ───────────────────────────────────────────────────────
@@ -195,4 +189,14 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     devLog('INFO', `Mode changed to: ${mode}`)
     updateTrayMode(mode)
   })
+
+  // ── tray:post-stop-options-changed ────────────────────────────────────────
+  // Renderer sends this whenever screen-lock or shutdown preferences change so
+  // the tray checkbox items stay in sync with the app UI.
+  ipcMain.on(
+    IPC_CHANNELS.TRAY_POST_STOP_OPTIONS_CHANGED,
+    (_event, { screenLock, shutdown }: { screenLock: boolean; shutdown: boolean }) => {
+      updateTrayPostStopOptions(screenLock, shutdown)
+    },
+  )
 }

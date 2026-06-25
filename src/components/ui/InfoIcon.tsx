@@ -35,13 +35,13 @@ export const WarningHint = ({ className, ...props }: WarningHintProps) => {
     <span
       className={cn(
         'inline-flex items-center justify-center flex-shrink-0',
-        'w-7 h-7 rounded-editorial border-[1.5px]',
+        'w-6 h-6 rounded-editorial border-[1.5px]',
         'border-editorial-warning/50 bg-editorial-warning-bg text-editorial-warning',
         className,
       )}
       {...props}
     >
-      <AlertTriangle size={15} strokeWidth={2} />
+      <AlertTriangle size={12} strokeWidth={2} />
     </span>
   )
 }

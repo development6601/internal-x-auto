@@ -21,6 +21,8 @@ let tray: Tray | null = null
 let _getWindow: GetWindow | null = null
 let _isRunning = false
 let _mode = 'basic'
+let _screenLock = false
+let _shutdown = false
 
 // ============================================================================
 // CONSTANTS — SVG icon definitions
@@ -98,6 +100,14 @@ function buildContextMenu(getWindow: GetWindow): Menu {
   const statusLabel = _isRunning ? '● Running' : '○ Stopped'
   const modeLabel   = `Mode: ${_mode === 'advanced' ? 'Advanced' : 'Basic'}`
 
+  const sendPreset = (hours: number) => {
+    const win = getWindow()
+    if (!win) return
+    win.show()
+    win.focus()
+    win.webContents.send(IPC_CHANNELS.TRAY_REQUEST_START_PRESET, { hours })
+  }
+
   return Menu.buildFromTemplate([
     { label: statusLabel, enabled: false },
     { type: 'separator' },
@@ -114,10 +124,42 @@ function buildContextMenu(getWindow: GetWindow): Menu {
       },
     },
     {
+      label: 'Quick Start',
+      enabled: !_isRunning,
+      submenu: [
+        { label: 'Start for 1 hour',  click: () => sendPreset(1) },
+        { label: 'Start for 2 hours', click: () => sendPreset(2) },
+        { label: 'Start for 3 hours', click: () => sendPreset(3) },
+        { label: 'Start for 4 hours', click: () => sendPreset(4) },
+      ],
+    },
+    {
       label: 'Stop Automation',
       enabled: _isRunning,
       click: () => {
         getWindow()?.webContents.send(IPC_CHANNELS.TRAY_REQUEST_STOP)
+      },
+    },
+    { type: 'separator' },
+    { label: 'After Timer Ends', enabled: false },
+    {
+      label: 'Screen Lock',
+      type: 'checkbox',
+      checked: _screenLock,
+      enabled: !_isRunning,
+      click: () => {
+        const next = !_screenLock
+        getWindow()?.webContents.send(IPC_CHANNELS.TRAY_SET_SCREEN_LOCK, { value: next })
+      },
+    },
+    {
+      label: 'Shutdown',
+      type: 'checkbox',
+      checked: _shutdown,
+      enabled: !_isRunning,
+      click: () => {
+        const next = !_shutdown
+        getWindow()?.webContents.send(IPC_CHANNELS.TRAY_SET_SHUTDOWN, { value: next })
       },
     },
     { type: 'separator' },
@@ -174,6 +216,17 @@ export function updateTrayStatus(isRunning: boolean): void {
 export function updateTrayMode(mode: string): void {
   if (!tray || !_getWindow) return
   _mode = mode
+  tray.setContextMenu(buildContextMenu(_getWindow))
+}
+
+/**
+ * Sync the After Timer Ends checkboxes in the tray menu with renderer state.
+ * Called from ipc.ts when the renderer sends tray:post-stop-options-changed.
+ */
+export function updateTrayPostStopOptions(screenLock: boolean, shutdown: boolean): void {
+  if (!tray || !_getWindow) return
+  _screenLock = screenLock
+  _shutdown = shutdown
   tray.setContextMenu(buildContextMenu(_getWindow))
 }
 

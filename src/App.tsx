@@ -2,8 +2,8 @@
 // IMPORTS
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Copy, Download, ScrollText, Terminal, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Bot, Copy, Download, Power, ShieldCheck, ScrollText, SlidersHorizontal, Terminal, Timer, Trash2, Zap } from 'lucide-react'
 import PrerequisiteStatusButton from '@/components/features/PrerequisiteStatusButton'
 import {
   Alert,
@@ -19,12 +19,7 @@ import {
   Tooltip,
   WarningHint,
 } from '@/components/ui'
-import {
-  ACTIVITY_LOG_TOOLTIP,
-  APP_MAX_WIDTH,
-  APP_NAME,
-  HIDE_ACTIVITY_LOG_TOOLTIP,
-} from '@/constants/app.constants'
+import { APP_MAX_WIDTH, APP_NAME, APP_VERSION } from '@/constants/app.constants'
 import type { AutomationMode, AutomationStatus } from '@/types/automation.types'
 import { cn } from '@/utils/cn'
 import { formatDuration, parseTimerInput, timerToSeconds } from '@/utils/format'
@@ -60,7 +55,7 @@ const MODE_OPTIONS: ModeOption[] = [
     label: 'Basic',
     tooltip: (
       <>
-        Browser tab and editor switching only. No application switching.
+        Switching multiple files or tabs within the last opened app.
       </>
     ),
   },
@@ -69,22 +64,21 @@ const MODE_OPTIONS: ModeOption[] = [
     label: 'Advanced',
     tooltip: (
       <>
-        Full activity simulation across applications. Includes application switching
-        (Alt+Tab on Windows, Cmd+Tab on macOS) between browser and editor.
+        Switching multiple files or tabs across multiple applications.
       </>
     ),
   },
 ]
 
-const CLOSE_UPWORK_TOOLTIP = (
+const SCREEN_LOCK_TOOLTIP = (
   <>
-    Closes the Upwork Desktop App when automation stops. Graceful close first, then force kill if needed. Check Dev Log for steps.
+    Locks the screen when automation stops. Automatically enabled when Shutdown is selected.
   </>
 )
 
 const SHUTDOWN_TOOLTIP = (
   <>
-    Shuts down the system after automation ends. Shows a 30-second countdown before shutdown — cancel anytime.
+    Shuts down the system after automation ends. Shows a 30-second countdown before shutdown. You can cancel anytime.
   </>
 )
 
@@ -98,6 +92,14 @@ const EXPORT_LOG_TOOLTIP = (
 
 const START_COUNTDOWN_SECONDS = 10
 
+const DOT_DECORATION = (
+  <div className="flex-shrink-0 grid grid-cols-4 gap-[3.5px] opacity-[0.18]" aria-hidden>
+    {Array.from({ length: 12 }).map((_, i) => (
+      <span key={i} className="w-[3px] h-[3px] rounded-full bg-editorial-muted block" />
+    ))}
+  </div>
+)
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
@@ -108,6 +110,16 @@ const getStatusBadge = (status: AutomationStatus) => {
   if (status === 'error') return { label: 'Error', variant: 'error' as const }
   return { label: 'Stopped', variant: 'neutral' as const }
 }
+
+// ============================================================================
+// SUB-COMPONENTS
+// ============================================================================
+
+const SectionIcon = ({ children }: { children: ReactNode }) => (
+  <div className="w-7 h-7 rounded-editorial flex items-center justify-center bg-editorial-secondary text-editorial-primary flex-shrink-0">
+    {children}
+  </div>
+)
 
 // ============================================================================
 // MAIN COMPONENT
@@ -121,12 +133,12 @@ const App = () => {
   const [mode, setMode] = useState<AutomationMode>('basic')
   const [timerHours, setTimerHours] = useState('0')
   const [timerMinutes, setTimerMinutes] = useState('0')
-  const [closeTracker, setCloseTracker] = useState(false)
+  const [screenLock, setScreenLock] = useState(false)
   const [shutdownAfterStop, setShutdownAfterStop] = useState(false)
 
   /** Post-stop choices locked when a run starts — shown read-only while active. */
   const [lockedPostStopOptions, setLockedPostStopOptions] = useState<{
-    closeTracker: boolean
+    screenLock: boolean
     shutdown: boolean
   } | null>(null)
 
@@ -138,7 +150,7 @@ const App = () => {
   const startPayloadRef = useRef<{
     mode: AutomationMode
     durationSeconds: number
-    closeTracker: boolean
+    screenLock: boolean
     shutdown: boolean
   } | null>(null)
 
@@ -147,7 +159,7 @@ const App = () => {
    * Used to compute elapsed/remaining from real time instead of counting
    * setInterval ticks, which Chromium throttles when the window is hidden.
    */
-  const runStartTimeRef   = useRef<number | null>(null)
+  const runStartTimeRef = useRef<number | null>(null)
   /** Total duration (seconds) captured when automation starts. */
   const runTotalSecondsRef = useRef<number>(0)
 
@@ -158,7 +170,7 @@ const App = () => {
   const [showShutdownModal, setShowShutdownModal] = useState(false)
   const [shutdownCountdown, setShutdownCountdown] = useState(30)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [showActivityLog, setShowActivityLog] = useState(false)
+  const [activeTab, setActiveTab] = useState<'main' | 'log'>('main')
   const [showDevLog, setShowDevLog] = useState(false)
   const [devLogCopied, setDevLogCopied] = useState(false)
   const [showPrereqSuccessModal, setShowPrereqSuccessModal] = useState(false)
@@ -226,10 +238,7 @@ const App = () => {
   const isActive = isRunning || isCountdown
   const statusBadge = useMemo(() => getStatusBadge(status), [status])
   const controlsDisabled = isActive
-
-  const activityLogTooltip = showActivityLog
-    ? HIDE_ACTIVITY_LOG_TOOLTIP
-    : ACTIVITY_LOG_TOOLTIP
+  const timerDisabled = hasNoTimer && !isActive
 
   const remainingDisplay = useMemo(() => {
     if (!isRunning) return null
@@ -238,23 +247,32 @@ const App = () => {
     return formatDuration(remainingSeconds)
   }, [isRunning, hasNoTimer, remainingSeconds])
 
-  const displayCloseTracker = lockedPostStopOptions?.closeTracker ?? closeTracker
+  const displayScreenLock = lockedPostStopOptions?.screenLock ?? screenLock
   const displayShutdownAfterStop = lockedPostStopOptions?.shutdown ?? shutdownAfterStop
+
+  const footerStatus = useMemo(() => {
+    if (status === 'running') return { label: 'Running', color: 'bg-editorial-success' }
+    if (status === 'countdown') return { label: 'Starting', color: 'bg-editorial-warning' }
+    if (status === 'error') return { label: 'Error', color: 'bg-editorial-error' }
+    return { label: 'Ready', color: 'bg-editorial-success' }
+  }, [status])
 
   // ============================================================================
   // FUNCTIONS - Event Handlers
   // ============================================================================
-  const beginCountdown = useCallback(() => {
+  const beginCountdown = useCallback((overrideDurationSeconds?: number) => {
+    const durationSecs = overrideDurationSeconds ?? totalTimerSeconds
+
     const postStopSnapshot = {
-      closeTracker,
+      screenLock,
       shutdown: shutdownAfterStop,
     }
 
     // Capture the current config so the countdown effect can read it safely
     startPayloadRef.current = {
       mode,
-      durationSeconds: totalTimerSeconds,
-      closeTracker: postStopSnapshot.closeTracker,
+      durationSeconds: durationSecs,
+      screenLock: postStopSnapshot.screenLock,
       shutdown: postStopSnapshot.shutdown,
     }
     setLockedPostStopOptions(postStopSnapshot)
@@ -262,9 +280,9 @@ const App = () => {
     setStatus('countdown')
     setCountdownSeconds(START_COUNTDOWN_SECONDS)
     setElapsedSeconds(0)
-    setRemainingSeconds(hasNoTimer ? null : totalTimerSeconds)
+    setRemainingSeconds(durationSecs === 0 ? null : durationSecs)
     announceCountdownStart()
-  }, [mode, totalTimerSeconds, closeTracker, shutdownAfterStop, hasNoTimer, announceCountdownStart])
+  }, [mode, totalTimerSeconds, screenLock, shutdownAfterStop, announceCountdownStart])
 
   const handleStartClick = useCallback(() => {
     if (isActive) return
@@ -281,6 +299,19 @@ const App = () => {
 
     beginCountdown()
   }, [isActive, prerequisitesReady, hasNoTimer, beginCountdown])
+
+  const handleStartPreset = useCallback((hours: number) => {
+    if (isActive) return
+    if (!prerequisitesReady) {
+      setErrorMessage('Requirements not met. Click the package icon in the header to install.')
+      return
+    }
+    // Update the timer display so the UI reflects what was started
+    setTimerHours(String(hours))
+    setTimerMinutes('0')
+    // Pass the duration directly — bypasses UI state which may not have updated yet
+    beginCountdown(hours * 3600)
+  }, [isActive, prerequisitesReady, beginCountdown])
 
   const handleConfirmIndefinite = useCallback(() => {
     setShowIndefiniteModal(false)
@@ -302,11 +333,15 @@ const App = () => {
     setLockedPostStopOptions(null)
 
     if (shutdownAfterStop) {
+      // Shutdown always runs with screen lock — show countdown modal first
       setShutdownCountdown(30)
       setShowShutdownModal(true)
       announceShutdown()
+    } else if (screenLock) {
+      // Standalone screen lock — lock immediately
+      window.electronAPI?.postStop?.lockScreen()
     }
-  }, [isActive, isRunning, elapsedSeconds, shutdownAfterStop, automationStop, announceStopped, announceShutdown])
+  }, [isActive, isRunning, elapsedSeconds, screenLock, shutdownAfterStop, automationStop, announceStopped, announceShutdown])
 
   const handleCancelShutdown = useCallback(() => {
     setShowShutdownModal(false)
@@ -316,10 +351,6 @@ const App = () => {
   const handleExportLog = useCallback(async () => {
     await exportLog()
   }, [exportLog])
-
-  const handleToggleActivityLog = useCallback(() => {
-    setShowActivityLog((prev) => !prev)
-  }, [])
 
   const handleToggleDevLog = useCallback(() => {
     setShowDevLog((prev) => !prev)
@@ -355,7 +386,8 @@ const App = () => {
     if (countdownSeconds <= 0) {
       // Spawn the Python script via Electron IPC
       if (startPayloadRef.current) {
-        automationStart(startPayloadRef.current)
+        const { mode: payloadMode, durationSeconds, shutdown } = startPayloadRef.current
+        automationStart({ mode: payloadMode, durationSeconds, shutdown })
       }
       setStatus('running') // Optimistic — confirmed via IPC onStatus callback
       setCountdownSeconds(null)
@@ -381,7 +413,7 @@ const App = () => {
 
     // Anchor elapsed to wall-clock time so the timer stays accurate even
     // when the window is hidden to tray and Chromium throttles setInterval.
-    runStartTimeRef.current   = Date.now()
+    runStartTimeRef.current = Date.now()
     runTotalSecondsRef.current = totalTimerSeconds
 
     const update = () => {
@@ -407,12 +439,16 @@ const App = () => {
       setCountdownSeconds(null)
       setLockedPostStopOptions(null)
       if (shutdownAfterStop) {
+        // Shutdown always runs with screen lock — show countdown modal first
         setShutdownCountdown(30)
         setShowShutdownModal(true)
         announceShutdown()
+      } else if (screenLock) {
+        // Standalone screen lock — lock immediately
+        window.electronAPI?.postStop?.lockScreen()
       }
     }
-  }, [isRunning, hasNoTimer, remainingSeconds, shutdownAfterStop, elapsedSeconds, automationStop, announceStopped, announceShutdown])
+  }, [isRunning, hasNoTimer, remainingSeconds, screenLock, shutdownAfterStop, elapsedSeconds, automationStop, announceStopped, announceShutdown])
 
   // ============================================================================
   // EFFECTS - Shutdown Countdown
@@ -422,8 +458,11 @@ const App = () => {
 
     if (shutdownCountdown <= 0) {
       setShowShutdownModal(false)
-      // Dispatch OS shutdown via IPC — Main runs platform-specific shutdown
-      window.electronAPI?.postStop?.executeShutdown()
+      // Lock the screen first, then shut down after 1 second
+      window.electronAPI?.postStop?.lockScreen()
+      window.setTimeout(() => {
+        window.electronAPI?.postStop?.executeShutdown()
+      }, 1000)
       return
     }
 
@@ -441,9 +480,11 @@ const App = () => {
   // ============================================================================
   const handleStartClickRef = useRef(handleStartClick)
   const handleStopClickRef = useRef(handleStopClick)
+  const handleStartPresetRef = useRef(handleStartPreset)
 
   useEffect(() => { handleStartClickRef.current = handleStartClick }, [handleStartClick])
   useEffect(() => { handleStopClickRef.current = handleStopClick }, [handleStopClick])
+  useEffect(() => { handleStartPresetRef.current = handleStartPreset }, [handleStartPreset])
 
   useEffect(() => {
     if (!window.electronAPI?.tray) return
@@ -454,10 +495,25 @@ const App = () => {
     const unsubStop = window.electronAPI.tray.onRequestStop(() => {
       handleStopClickRef.current()
     })
+    const unsubPreset = window.electronAPI.tray.onRequestStartPreset(({ hours }) => {
+      handleStartPresetRef.current(hours)
+    })
+    // Tray checkbox clicked: sync back into React state
+    const unsubScreenLock = window.electronAPI.tray.onSetScreenLock(({ value }) => {
+      setScreenLock(value)
+      if (!value) setShutdownAfterStop(false)
+    })
+    const unsubShutdown = window.electronAPI.tray.onSetShutdown(({ value }) => {
+      setShutdownAfterStop(value)
+      if (value) setScreenLock(true)
+    })
 
     return () => {
       unsubStart()
       unsubStop()
+      unsubPreset()
+      unsubScreenLock()
+      unsubShutdown()
     }
   }, []) // stable — subscribes once, uses refs for latest handlers
 
@@ -467,6 +523,13 @@ const App = () => {
   useEffect(() => {
     window.electronAPI?.tray?.notifyModeChanged(mode)
   }, [mode])
+
+  // ============================================================================
+  // EFFECTS - Post-stop options sync to tray
+  // ============================================================================
+  useEffect(() => {
+    window.electronAPI?.tray?.notifyPostStopOptionsChanged(screenLock, shutdownAfterStop)
+  }, [screenLock, shutdownAfterStop])
 
   // ============================================================================
   // RENDER - Main Component
@@ -480,9 +543,46 @@ const App = () => {
         {/* Header */}
         <header className="relative z-20 flex-shrink-0 border-b border-editorial-border bg-editorial-base px-4 sm:px-5 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="font-display  text-2xl sm:text-4xl font-light text-editorial-text-primary leading-none truncate">
+            {/* <h1 className="font-display  text-2xl sm:text-4xl font-light text-editorial-text-primary leading-none truncate">
               {APP_NAME}
-            </h1>
+            </h1> */}
+
+            {/* Tab Bar */}
+            <div className="flex-shrink-0 flex items-center bg-editorial-base">
+              <div
+                className="flex items-center gap-0.5 p-1 rounded-full"
+                style={{ background: 'var(--color-bg-secondary)' }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('main')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1 rounded-full font-body text-[11px] font-bold tracking-widest transition-all duration-200 select-none',
+                    activeTab === 'main'
+                      ? 'bg-white text-editorial-text-primary'
+                      : 'text-editorial-muted hover:text-editorial-text-secondary',
+                  )}
+                  style={activeTab === 'main' ? { boxShadow: '0 1px 4px rgba(44,24,16,0.10)' } : undefined}
+                >
+                  <SlidersHorizontal size={12} strokeWidth={2.5} />
+                  Main
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('log')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1 rounded-full font-body text-[11px] font-bold tracking-widest transition-all duration-200 select-none',
+                    activeTab === 'log'
+                      ? 'bg-white text-editorial-text-primary'
+                      : 'text-editorial-muted hover:text-editorial-text-secondary',
+                  )}
+                  style={activeTab === 'log' ? { boxShadow: '0 1px 4px rgba(44,24,16,0.10)' } : undefined}
+                >
+                  <ScrollText size={12} strokeWidth={2.5} />
+                  Log
+                </button>
+              </div>
+            </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
               <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
@@ -492,26 +592,6 @@ const App = () => {
                 onInstall={handlePrereqInstallClick}
                 disabled={isActive}
               />
-
-              {/* Activity Log toggle */}
-              <Tooltip content={activityLogTooltip} maxWidth={220} placement="bottom">
-                <button
-                  type="button"
-                  onClick={handleToggleActivityLog}
-                  aria-label={showActivityLog ? 'Hide activity log' : 'Show activity log'}
-                  aria-pressed={showActivityLog}
-                  className={cn(
-                    'inline-flex items-center justify-center w-8 h-8 rounded-editorial border-[1.5px]',
-                    'transition-colors duration-150',
-                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-editorial-primary focus-visible:outline-offset-2',
-                    showActivityLog
-                      ? 'border-editorial-primary bg-editorial-primary text-white'
-                      : 'border-editorial-border text-editorial-muted hover:bg-editorial-secondary hover:text-editorial-text-primary',
-                  )}
-                >
-                  <ScrollText size={16} strokeWidth={2} />
-                </button>
-              </Tooltip>
 
               {/* Developer log toggle */}
               <Tooltip content="Developer log — internal debug events" maxWidth={220} placement="bottom">
@@ -536,154 +616,192 @@ const App = () => {
           </div>
         </header>
 
+
+
         {/* Main Content */}
         <main className="flex-1 p-3 sm:p-4 min-h-0 flex flex-col gap-3 sm:gap-4 overflow-y-auto">
-          {/* Mode Selector */}
-          <Card padding="xs">
-            <div className="px-2 pt-2 pb-1">
-              <SectionLabel className="!mb-2">Automation Mode</SectionLabel>
-            </div>
-            <RadioGroup
-              name="automation-mode"
-              value={mode}
-              options={MODE_OPTIONS}
-              onChange={setMode}
-              disabled={controlsDisabled}
-              layout="inline"
-            />
-          </Card>
-
-          {/* Timer Configuration */}
-          <Card padding="sm">
-            <div className="flex items-center justify-between gap-2 border-b border-editorial-border pb-2 mb-4">
-              <SectionLabel bordered={false} className="mb-0 pb-0">
-                Stop Timer
-              </SectionLabel>
-              {hasNoTimer && (
-                <Tooltip content={NO_TIMER_TOOLTIP} maxWidth={240} placement="auto">
-                  <WarningHint aria-label="No timer set warning" />
-                </Tooltip>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="timer-hours">Hours</Label>
-                <Input
-                  id="timer-hours"
-                  type="number"
-                  min={0}
-                  max={99}
-                  value={timerHours}
-                  onChange={(event) => setTimerHours(event.target.value)}
-                  disabled={controlsDisabled}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <Label htmlFor="timer-minutes">Minutes</Label>
-                <Input
-                  id="timer-minutes"
-                  type="number"
-                  min={0}
-                  max={59}
-                  value={timerMinutes}
-                  onChange={(event) => setTimerMinutes(event.target.value)}
-                  disabled={controlsDisabled}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* Options */}
-          <Card padding="sm">
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <SectionLabel bordered={false} className="mb-0 pb-0">
-                Post-Stop Options
-              </SectionLabel>
-            </div>
-            <div className="flex flex-wrap gap-x-5 gap-y-3">
-              <Checkbox
-                label="Close Upwork"
-                tooltip={CLOSE_UPWORK_TOOLTIP}
-                checked={displayCloseTracker}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                  setCloseTracker(event.target.checked)
-                }
-                readOnly={isActive}
-              />
-              <Checkbox
-                label="Shutdown"
-                tooltip={SHUTDOWN_TOOLTIP}
-                checked={displayShutdownAfterStop}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                  setShutdownAfterStop(event.target.checked)
-                }
-                readOnly={isActive}
-              />
-            </div>
-          </Card>
-
-          {/* Controls */}
-          <Card padding="sm">
-            <SectionLabel>Controls</SectionLabel>
-            {errorMessage && (
-              <Alert variant="error" title="Error" className="!mb-2">
-                {errorMessage}
-              </Alert>
-            )}
-            <div className="grid grid-cols-2 gap-3 w-full">
-              <Button
-                variant="primary"
-                size="sm"
-                fullWidth
-                className="w-full"
-                onClick={handleStartClick}
-                disabled={isActive}
-              >
-                Start
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                fullWidth
-                className="w-full"
-                onClick={handleStopClick}
-                disabled={!isActive}
-              >
-                Stop
-              </Button>
-            </div>
-
-            {isRunning && (
-              <div className="mt-4 pt-4 border-t border-editorial-border grid grid-cols-2 gap-3">
-                <div className="min-w-0">
-                  <p className="font-body text-[10px] font-bold uppercase tracking-label text-editorial-muted mb-1">
-                    Running
-                  </p>
-                  <p className="font-body text-sm sm:text-base text-editorial-text-primary truncate">
-                    {formatDuration(elapsedSeconds)}
-                  </p>
+          {activeTab === 'main' && (
+            <>
+              {/* Mode Selector */}
+              <Card padding="sm">
+                <div className="border-b border-editorial-border pb-1 mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2.5">
+                      <SectionIcon><Bot size={13} strokeWidth={1.75} /></SectionIcon>
+                      <SectionLabel bordered={false} className="mb-0 pb-0">Automation Mode</SectionLabel>
+                    </div>
+                    {DOT_DECORATION}
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="font-body text-[10px] font-bold uppercase tracking-label text-editorial-muted mb-1">
-                    Remaining
-                  </p>
-                  <p className="font-body text-sm sm:text-base text-editorial-text-primary truncate">
-                    {remainingDisplay}
-                  </p>
-                </div>
-              </div>
-            )}
-          </Card>
+                <RadioGroup
+                  name="automation-mode"
+                  value={mode}
+                  options={MODE_OPTIONS}
+                  onChange={setMode}
+                  disabled={controlsDisabled}
+                  layout="inline"
+                />
+              </Card>
 
-          {/* Activity Log — hidden by default */}
-          {showActivityLog && (
-            <Card className="flex flex-col min-h-[200px] max-h-[280px] overflow-hidden" padding="sm">
-              <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                <SectionLabel className="mb-0 border-0 pb-0 flex-1 text-xs font-extrabold">
-                  Activity Log
-                </SectionLabel>
+              {/* Timer Configuration */}
+              <Card padding="sm">
+                <div className="flex items-center justify-between gap-2 border-b border-editorial-border pb-2 mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <SectionIcon><Timer size={13} strokeWidth={1.75} /></SectionIcon>
+                    <SectionLabel bordered={false} className="mb-0 pb-0">Stop Timer</SectionLabel>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {hasNoTimer && (
+                      <Tooltip content={NO_TIMER_TOOLTIP} maxWidth={240} placement="auto">
+                        <WarningHint aria-label="No timer set warning" />
+                      </Tooltip>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="timer-hours">Hours</Label>
+                    <Input
+                      id="timer-hours"
+                      type="number"
+                      min={0}
+                      max={99}
+                      value={timerHours}
+                      onChange={(event) => setTimerHours(event.target.value)}
+                      disabled={controlsDisabled}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="timer-minutes">Minutes</Label>
+                    <Input
+                      id="timer-minutes"
+                      type="number"
+                      min={0}
+                      max={59}
+                      value={timerMinutes}
+                      onChange={(event) => setTimerMinutes(event.target.value)}
+                      disabled={controlsDisabled}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              </Card>
+
+              {/* Options */}
+              <Card
+                padding="sm"
+                className={cn('transition-opacity duration-300', timerDisabled && 'opacity-50')}
+              >
+                <div className="flex items-center justify-between gap-2 mb-4 border-b border-editorial-border pb-2">
+                  <div className="flex items-center gap-2.5">
+                    <SectionIcon><Power size={13} strokeWidth={1.75} /></SectionIcon>
+                    <SectionLabel bordered={false} className="mb-0 pb-0">After Timer Ends</SectionLabel>
+                  </div>
+                  {timerDisabled ? (
+                    <span className="font-body text-[9px] font-bold uppercase tracking-widest text-editorial-muted select-none">
+                      Set a timer first
+                    </span>
+                  ) : DOT_DECORATION}
+                </div>
+                <div className={cn('flex flex-wrap gap-x-5 gap-y-3 py-1', timerDisabled && 'pointer-events-none')}>
+                  <Checkbox
+                    label="Screen Lock"
+                    tooltip={SCREEN_LOCK_TOOLTIP}
+                    checked={displayScreenLock}
+                    disabled={timerDisabled}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                      const checked = event.target.checked
+                      setScreenLock(checked)
+                      // Uncheck Shutdown when Screen Lock is disabled — shutdown requires it
+                      if (!checked) setShutdownAfterStop(false)
+                    }}
+                    readOnly={isActive}
+                  />
+                  <Checkbox
+                    label="Shutdown"
+                    tooltip={SHUTDOWN_TOOLTIP}
+                    checked={displayShutdownAfterStop}
+                    disabled={timerDisabled}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                      const checked = event.target.checked
+                      setShutdownAfterStop(checked)
+                      // Auto-enable Screen Lock when Shutdown is selected — lock must run first
+                      if (checked) setScreenLock(true)
+                    }}
+                    readOnly={isActive}
+                  />
+                </div>
+              </Card>
+
+              {/* Controls */}
+              <Card padding="sm">
+                <div className="flex items-center justify-between gap-2 border-b border-editorial-border pb-2 mb-5">
+                  <div className="flex items-center gap-2.5">
+                    <SectionIcon><Zap size={13} strokeWidth={1.75} /></SectionIcon>
+                    <SectionLabel bordered={false} className="mb-0 pb-0">Controls</SectionLabel>
+                  </div>
+                  {DOT_DECORATION}
+                </div>
+                {errorMessage && (
+                  <Alert variant="error" title="Error" className="!mb-2">
+                    {errorMessage}
+                  </Alert>
+                )}
+                <div className="grid grid-cols-2 gap-3 w-full">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    fullWidth
+                    className="w-full !bg-editorial-success !border-editorial-success text-editorial-success-bg"
+                    onClick={handleStartClick}
+                    disabled={isActive}
+                  >
+                    Start
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    fullWidth
+                    className="w-full !text-editorial-error !border-editorial-error"
+                    onClick={handleStopClick}
+                    disabled={!isActive}
+                  >
+                    Stop
+                  </Button>
+                </div>
+
+                {isRunning && (
+                  <div className="mt-4 pt-4 border-t border-editorial-border grid grid-cols-2 gap-3">
+                    <div className="min-w-0">
+                      <p className="font-body text-[10px] font-bold uppercase tracking-label text-editorial-muted mb-1">
+                        Running
+                      </p>
+                      <p className="font-body text-sm sm:text-base text-editorial-text-primary truncate">
+                        {formatDuration(elapsedSeconds)}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-body text-[10px] font-bold uppercase tracking-label text-editorial-muted mb-1">
+                        Remaining
+                      </p>
+                      <p className="font-body text-sm sm:text-base text-editorial-text-primary truncate">
+                        {remainingDisplay}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </>
+          )}
+
+          {activeTab === 'log' && (
+            <Card className="flex flex-col flex-1 min-h-0 overflow-hidden" padding="sm">
+              <div className="flex items-center justify-between mb-4 flex-shrink-0 border-b border-editorial-border pb-2">
+                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                  <SectionIcon><ScrollText size={13} strokeWidth={1.75} /></SectionIcon>
+                  <SectionLabel bordered={false} className="mb-0 pb-0">Activity Log</SectionLabel>
+                </div>
                 <Tooltip content={EXPORT_LOG_TOOLTIP} maxWidth={220} placement="top">
                   <button
                     type="button"
@@ -701,7 +819,7 @@ const App = () => {
                 </Tooltip>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto border border-editorial-border rounded-editorial bg-editorial-base">
+              <div className="flex-1 min-h-0 overflow-y-auto rounded-editorial bg-editorial-base pr-1">
                 {logEntries.length === 0 ? (
                   <p className="p-4 font-body text-sm text-editorial-muted text-center">
                     No activity recorded yet.
@@ -722,6 +840,23 @@ const App = () => {
             </Card>
           )}
         </main>
+
+        {/* Footer */}
+        <footer className="flex-shrink-0 flex items-center justify-between px-4 sm:px-5 py-2 border-t border-editorial-border bg-editorial-base">
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck size={11} className="text-editorial-muted" strokeWidth={2} />
+            <span className="font-body text-[12px] text-editorial-muted">
+              {APP_NAME}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="font-body text-[10px] text-editorial-disabled">{APP_VERSION}</span>
+            <div className="flex items-center gap-1.5">
+              <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', footerStatus.color)} />
+              <span className="font-body text-[10px] text-editorial-muted">{footerStatus.label}</span>
+            </div>
+          </div>
+        </footer>
 
         {/* Countdown Overlay */}
         {isCountdown && countdownSeconds !== null && (
@@ -792,11 +927,11 @@ const App = () => {
                     const levelMatch = entry.match(/\[(\w+)\](?:\s*\[(\w+)\])?/)
                     const level = levelMatch ? (levelMatch[2] ?? levelMatch[1]) : 'INFO'
                     const levelColor =
-                      level === 'ERROR'  ? 'text-[#e06c75]' :
-                      level === 'WARN'   ? 'text-[#e5c07b]' :
-                      level === 'SCRIPT' ? 'text-[#56b6c2]' :
-                      level === 'STDERR' ? 'text-[#d19a66]' :
-                                           'text-[#61afef]'
+                      level === 'ERROR' ? 'text-[#e06c75]' :
+                        level === 'WARN' ? 'text-[#e5c07b]' :
+                          level === 'SCRIPT' ? 'text-[#56b6c2]' :
+                            level === 'STDERR' ? 'text-[#d19a66]' :
+                              'text-[#61afef]'
                     const rowBg = idx % 2 === 0 ? '' : 'bg-[#0a0d14]'
                     // Split: timestamp+level prefix vs message body
                     const prefixEnd = entry.indexOf(']', entry.indexOf('[', 5)) + 1

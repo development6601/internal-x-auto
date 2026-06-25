@@ -32,12 +32,13 @@ export default {
         body: ['Syne', 'Segoe UI', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
-        editorial: '4px',
+        editorial: '10px',
       },
       boxShadow: {
         card: 'var(--shadow-card)',
         modal: 'var(--shadow-modal)',
         'input-focus': 'var(--shadow-input-focus)',
+        'button-primary': 'var(--shadow-button-primary)',
       },
       letterSpacing: {
         button: '0.08em',

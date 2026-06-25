@@ -431,6 +431,52 @@ export function closeUpworkTracker(onLog: LogCallback): void {
   devLog('WARN', entry)
 }
 
+// ============================================================================
+// UTILITY FUNCTIONS — OS screen lock
+// ============================================================================
+
+const runPlatformScreenLock = (): void => {
+  if (process.platform === 'win32') {
+    execSync('rundll32.exe user32.dll,LockWorkStation', { stdio: 'ignore' })
+    return
+  }
+
+  if (process.platform === 'darwin') {
+    execSync(
+      '"/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession" -suspend',
+      { stdio: 'ignore' },
+    )
+    return
+  }
+
+  throw new Error(`Screen lock is not supported on platform: ${process.platform}`)
+}
+
+/**
+ * Lock the screen on the host OS.
+ *
+ * - Windows: `rundll32.exe user32.dll,LockWorkStation`
+ * - macOS: CGSession -suspend
+ */
+export function executeScreenLock(onLog: LogCallback): void {
+  const platformLabel =
+    process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : process.platform
+
+  const entry = `Screen lock initiated (${platformLabel})`
+  writeLog(entry)
+  onLog(entry)
+  devLog('INFO', entry)
+
+  try {
+    runPlatformScreenLock()
+  } catch (err) {
+    const errEntry = `ERROR — Screen lock command failed: ${err instanceof Error ? err.message : String(err)}`
+    writeLog(errEntry)
+    onLog(errEntry)
+    devLog('ERROR', errEntry)
+  }
+}
+
 /**
  * Shut down the host OS after the renderer's 30-second countdown ends.
  *

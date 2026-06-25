@@ -39,7 +39,9 @@ const SectionLabel = ({
       )}
       {...props}
     >
-      {children}
+      <span className="inline-flex items-center gap-2">
+        <span>{children}</span>
+      </span>
     </div>
   )
 }
