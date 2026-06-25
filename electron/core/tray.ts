@@ -22,38 +22,71 @@ let _isRunning = false
 let _mode = 'advanced'
 
 // ============================================================================
-// UTILITY FUNCTIONS — Icon generation
+// CONSTANTS — SVG icon definitions
+// ============================================================================
+
+// Running state: Power icon on success-green background (#2d6a4f from design system)
+// Matches `--color-success` for immediate "all-good" recognition
+const SVG_RUNNING = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="6" fill="#2d6a4f"/>
+  <g transform="translate(4,4)">
+    <path d="M12 2v10" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M18.4 6.6a9 9 0 1 1-12.77.04" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>`
+
+// Stopped state: PowerOff icon on error-red background (#9b2335 from design system)
+// Matches `--color-error` for immediate "inactive" recognition
+const SVG_STOPPED = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="6" fill="#9b2335"/>
+  <g transform="translate(4,4)">
+    <path d="M18.36 6.64A9 9 0 0 1 20.77 15" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <path d="M6.16 6.16a9 9 0 1 0 12.68 12.68" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <path d="M12 2v4" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <path d="M2 2L22 22" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>`
+
+// ============================================================================
+// UTILITY FUNCTIONS — Icon builder
 // ============================================================================
 
 /**
- * Creates a 16×16 circle icon programmatically using raw BGRA pixel data.
- * Green = automation running, gray = stopped/idle.
- * No external image files required.
+ * Convert an inline SVG string to a NativeImage via base64 data URL.
+ * Falls back to a minimal 16×16 BGRA bitmap if the data URL fails.
  */
-function buildTrayIcon(isRunning: boolean): NativeImage {
-  const SIZE = 16
-  const buf = Buffer.alloc(SIZE * SIZE * 4, 0) // all transparent
+function svgToNativeImage(svg: string, isRunning: boolean): NativeImage {
+  try {
+    const dataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svg.trim()).toString('base64')
+    const img = nativeImage.createFromDataURL(dataUrl)
+    if (!img.isEmpty()) return img
+  } catch {
+    // fall through to bitmap fallback
+  }
 
-  // BGRA: green #22c55e when running, gray #6b7280 when stopped
-  const [b, g, r] = isRunning ? [94, 197, 34] : [128, 114, 107]
+  // ── Bitmap fallback: 16×16 filled circle (BGRA) ──────────────────────────
+  // Used when SVG data-URL rendering is unavailable on the platform.
+  const SIZE = 16
+  const buf = Buffer.alloc(SIZE * SIZE * 4, 0)
+  // Running: green #2d6a4f → BGRA [79, 106, 45, 255]
+  // Stopped: red  #9b2335 → BGRA [53, 35, 155, 255]
+  const [b, g, r] = isRunning ? [79, 106, 45] : [53, 35, 155]
   const cx = (SIZE - 1) / 2
   const cy = (SIZE - 1) / 2
-  const radius = SIZE / 2 - 1.5 // slight inset so the circle isn't clipped
 
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
-      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
-      if (dist <= radius) {
+      if (Math.sqrt((x - cx) ** 2 + (y - cy) ** 2) <= SIZE / 2 - 1) {
         const i = (y * SIZE + x) * 4
-        buf[i] = b
-        buf[i + 1] = g
-        buf[i + 2] = r
-        buf[i + 3] = 255
+        buf[i] = b; buf[i + 1] = g; buf[i + 2] = r; buf[i + 3] = 255
       }
     }
   }
-
   return nativeImage.createFromBitmap(buf, { width: SIZE, height: SIZE })
+}
+
+function buildTrayIcon(isRunning: boolean): NativeImage {
+  return svgToNativeImage(isRunning ? SVG_RUNNING : SVG_STOPPED, isRunning)
 }
 
 // ============================================================================
@@ -62,7 +95,7 @@ function buildTrayIcon(isRunning: boolean): NativeImage {
 
 function buildContextMenu(getWindow: GetWindow): Menu {
   const statusLabel = _isRunning ? '● Running' : '○ Stopped'
-  const modeLabel = `Mode: ${_mode === 'advanced' ? 'Advanced' : 'Basic'}`
+  const modeLabel   = `Mode: ${_mode === 'advanced' ? 'Advanced' : 'Basic'}`
 
   return Menu.buildFromTemplate([
     { label: statusLabel, enabled: false },
@@ -93,17 +126,11 @@ function buildContextMenu(getWindow: GetWindow): Menu {
       label: 'Open Application',
       click: () => {
         const win = getWindow()
-        if (win) {
-          win.show()
-          win.focus()
-        }
+        if (win) { win.show(); win.focus() }
       },
     },
     { type: 'separator' },
-    {
-      label: 'Exit',
-      click: () => app.quit(),
-    },
+    { label: 'Exit', click: () => app.quit() },
   ])
 }
 
@@ -117,24 +144,19 @@ function buildContextMenu(getWindow: GetWindow): Menu {
  */
 export function createTray(getWindow: GetWindow): void {
   _getWindow = getWindow
-
   tray = new Tray(buildTrayIcon(false))
   tray.setToolTip('InternalX — Stopped')
   tray.setContextMenu(buildContextMenu(getWindow))
 
-  // Double-click restores the window
   tray.on('double-click', () => {
     const win = getWindow()
-    if (win) {
-      win.show()
-      win.focus()
-    }
+    if (win) { win.show(); win.focus() }
   })
 }
 
 /**
- * Update the tray icon and menu to reflect the current running state.
- * Called by ipc.ts whenever automation:status changes.
+ * Sync tray icon and menu with the current automation running state.
+ * Called from ipc.ts on every automation:status change.
  */
 export function updateTrayStatus(isRunning: boolean): void {
   if (!tray || !_getWindow) return
@@ -145,8 +167,8 @@ export function updateTrayStatus(isRunning: boolean): void {
 }
 
 /**
- * Update the mode label shown in the tray context menu.
- * Called by ipc.ts whenever the renderer notifies mode change.
+ * Refresh the mode label in the tray context menu.
+ * Called from ipc.ts when the renderer sends app:mode-changed.
  */
 export function updateTrayMode(mode: string): void {
   if (!tray || !_getWindow) return
@@ -154,9 +176,7 @@ export function updateTrayMode(mode: string): void {
   tray.setContextMenu(buildContextMenu(_getWindow))
 }
 
-/**
- * Destroy the tray instance on app exit.
- */
+/** Destroy the tray on app exit. */
 export function destroyTray(): void {
   tray?.destroy()
   tray = null

@@ -6,6 +6,7 @@ import { execSync, spawn } from 'child_process'
 import type { ChildProcess } from 'child_process'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { devLog } from './dev-logger.js'
 import { writeLog } from './logger.js'
 import { formatDuration } from './utils.js'
 import type { AutomationStatus, StartPayload } from './types.js'
@@ -23,9 +24,9 @@ export type LogCallback = (entry: string) => void
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// In dev  → dist-electron/core/automation.js → ../../../scripts/
-// In prod → resources/app.asar/dist-electron/core/ → use resourcesPath
-const SCRIPTS_DIR_DEV = path.resolve(__dirname, '../../scripts')
+// In dev  → dist-electron/main.js (flat bundle) → ../scripts/
+// In prod → resources/app.asar/dist-electron/ → use resourcesPath
+const SCRIPTS_DIR_DEV = path.resolve(__dirname, '../scripts')
 const FORCE_KILL_DELAY_MS = 3000
 
 // ============================================================================
@@ -93,8 +94,11 @@ export function startAutomation(
   onStatus: StatusCallback,
   onLog: LogCallback,
 ): void {
+  devLog('INFO', `startAutomation() called — payload: ${JSON.stringify(payload)}`)
+
   // Guard: prevent double spawn
   if (child) {
+    devLog('WARN', 'startAutomation() called but child is already running — ignoring')
     console.warn('[Automation] Already running — ignoring start request')
     return
   }
@@ -103,22 +107,30 @@ export function startAutomation(
   _onLog = onLog
   _intentionallyStopped = false
 
+  devLog('INFO', `Platform: ${process.platform} | VITE_DEV_SERVER_URL: ${process.env['VITE_DEV_SERVER_URL'] ?? '(not set)'}`)
+
   // ── Step 1: Detect Python ─────────────────────────────────────────────────
+  devLog('INFO', 'Detecting Python binary...')
   const pythonBin = detectPythonBinary()
   if (!pythonBin) {
+    devLog('ERROR', 'Python binary not found in PATH')
     const entry = 'ERROR — Python binary not found in PATH'
     writeLog(entry)
     onLog(entry)
     onStatus('error', 'Python not found. Please ensure Python 3 is installed and available in PATH.')
     return
   }
+  devLog('INFO', `Python detected: ${pythonBin}`)
 
   // ── Step 2: Resolve script path ───────────────────────────────────────────
   const scriptsDir = getScriptsDir()
   const scriptFile = getScriptFilename(payload.mode)
   const scriptPath = path.join(scriptsDir, scriptFile)
+  devLog('INFO', `Scripts dir: ${scriptsDir} | Script file: ${scriptFile} | Full path: ${scriptPath}`)
 
   // ── Step 3: Spawn process ─────────────────────────────────────────────────
+  devLog('INFO', `Spawning: ${pythonBin} ${scriptPath} --mode ${payload.mode} --duration ${payload.durationSeconds} --shutdown ${payload.shutdown}`)
+  devLog('INFO', `spawn cwd: ${scriptsDir}`)
   try {
     child = spawn(
       pythonBin,
@@ -129,18 +141,23 @@ export function startAutomation(
         '--shutdown', String(payload.shutdown),
       ],
       {
+        cwd: scriptsDir,
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     )
   } catch (err) {
-    const entry = `ERROR — Failed to spawn Python: ${err instanceof Error ? err.message : String(err)}`
+    const msg = err instanceof Error ? err.message : String(err)
+    devLog('ERROR', `spawn() failed: ${msg}`)
+    const entry = `ERROR — Failed to spawn Python: ${msg}`
     writeLog(entry)
     onLog(entry)
     onStatus('error', entry)
     child = null
     return
   }
+
+  devLog('INFO', `Python process spawned (PID: ${child.pid ?? 'unknown'})`)
 
   // ── Step 4: Log start ─────────────────────────────────────────────────────
   const timerLabel =
@@ -162,6 +179,7 @@ export function startAutomation(
   child.stdout?.on('data', (data: Buffer) => {
     const line = data.toString().trim()
     if (line) {
+      devLog('SCRIPT', line)
       const entry = `SCRIPT — ${line}`
       writeLog(entry)
       onLog(entry)
@@ -171,6 +189,7 @@ export function startAutomation(
   child.stderr?.on('data', (data: Buffer) => {
     const line = data.toString().trim()
     if (line) {
+      devLog('STDERR', line)
       const entry = `SCRIPT STDERR — ${line}`
       writeLog(entry)
       onLog(entry)
@@ -180,6 +199,7 @@ export function startAutomation(
   // ── Step 6: Handle process exit ───────────────────────────────────────────
   child.on('error', (err) => {
     clearForceKillTimer()
+    devLog('ERROR', `Process error: ${err.message}`)
     const entry = `ERROR — Script process error: ${err.message}`
     writeLog(entry)
     _onLog?.(entry)
@@ -195,11 +215,14 @@ export function startAutomation(
     _intentionallyStopped = false
     child = null
 
+    devLog('INFO', `Process exited (code: ${code}, intentional: ${wasIntentional})`)
+
     // ipc.ts handles the status update for intentional stops
     if (wasIntentional) return
 
     // Unexpected exit — report as error
     if (code !== 0 && code !== null) {
+      devLog('WARN', `Unexpected exit code: ${code}`)
       const entry = `ERROR — Script exited unexpectedly (code: ${code})`
       writeLog(entry)
       _onLog?.(entry)
