@@ -1,5 +1,6 @@
 {
   "name": "automation-control",
+  "productName": "InternalX",
   "version": "1.0.0",
   "description": "Automation Control Application",
   "main": "dist-electron/main.js",

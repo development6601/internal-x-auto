@@ -2,6 +2,8 @@
 // CONSTANTS
 // ============================================================================
 
+export const APP_NAME = 'InternalX'
+
 export const APP_MAX_WIDTH = 650
 
 export const ACTIVITY_LOG_TOOLTIP =
