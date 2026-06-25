@@ -1,10 +1,9 @@
 /**
- * electron-builder afterPack hook — runs after packaging, before installer creation.
+ * electron-builder afterPack hook — embed InternalX icon into the Windows EXE.
  *
- * electron-builder's signAndEditExecutable:false skips its own rcedit step
- * (needed to avoid the winCodeSign symlink error on Windows without Developer Mode).
- * This hook applies the icon and version metadata ourselves using the rcedit npm
- * package so the final EXE shows InternalX branding instead of Electron defaults.
+ * signAndEditExecutable:false skips electron-builder's own rcedit step (avoids
+ * the winCodeSign symlink error without Developer Mode). This hook applies the
+ * icon and version metadata using rcedit v5's API directly.
  */
 
 'use strict'
@@ -24,38 +23,42 @@ exports.default = async function afterPack(context) {
   const exePath     = path.join(context.appOutDir, exeName)
 
   if (!fs.existsSync(exePath)) {
-    console.warn(`[afterPack] EXE not found at ${exePath} — skipping icon set`)
+    console.warn(`[afterPack] EXE not found at ${exePath} — skipping`)
     return
   }
 
   const iconPath = path.resolve(process.cwd(), 'resources', 'icon.ico')
   if (!fs.existsSync(iconPath)) {
-    console.warn(`[afterPack] icon.ico not found at ${iconPath} — skipping icon set`)
+    console.warn(`[afterPack] icon.ico not found at ${iconPath} — skipping`)
     return
   }
 
-  let rcedit
+  let rceditFn
   try {
-    rcedit = require('rcedit').rcedit
-  } catch {
-    console.warn('[afterPack] rcedit module not found — icon will not be embedded in EXE')
+    const mod = await import('rcedit')
+    rceditFn = mod.rcedit
+  } catch (err) {
+    console.warn('[afterPack] rcedit import failed:', err.message)
     return
   }
 
-  console.log(`[afterPack] Setting icon and version on ${exeName} …`)
+  console.log(`[afterPack] Embedding icon into ${exeName} …`)
 
   try {
-    await rcedit(exePath, {
+    await rceditFn(exePath, {
       icon: iconPath,
-      'product-name':       productName,
-      'file-description':   productName,
-      'company-name':       productName,
-      'internal-name':      productName,
-      'original-filename':  exeName,
-      'file-version':       version,
-      'product-version':    version,
+      'file-version': version,
+      'product-version': version,
+      'version-string': {
+        ProductName: productName,
+        FileDescription: productName,
+        CompanyName: productName,
+        InternalName: productName,
+        OriginalFilename: exeName,
+        LegalCopyright: `Copyright © ${productName}`,
+      },
     })
-    console.log(`[afterPack] ✓ ${exeName} icon and version info updated`)
+    console.log(`[afterPack] ✓ ${exeName} icon embedded`)
   } catch (err) {
     console.error('[afterPack] rcedit failed:', err.message)
   }

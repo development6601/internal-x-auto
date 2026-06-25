@@ -2,7 +2,7 @@
 // IMPORTS
 // ============================================================================
 
-import { nativeImage } from 'electron'
+import { app, nativeImage } from 'electron'
 import type { NativeImage } from 'electron'
 import fs from 'fs'
 import path from 'path'
@@ -13,45 +13,6 @@ import { fileURLToPath } from 'url'
 // ============================================================================
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-
-// process.resourcesPath is the real filesystem path to the app's `resources/`
-// folder outside the asar archive — set by electron-builder for packaged apps.
-// Checking this first avoids loading the icon from inside the asar, which can
-// fail silently on Windows when used for taskbar/window icons.
-const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
-
-const buildIconCandidates = (preferIco: boolean): string[] => {
-  const candidates: string[] = []
-
-  // 1. Packaged app: real filesystem path outside asar (most reliable on Windows)
-  if (resourcesPath) {
-    if (preferIco) {
-      candidates.push(path.join(resourcesPath, 'resources', 'icon.ico'))
-      candidates.push(path.join(resourcesPath, 'resources', 'icon.png'))
-    } else {
-      candidates.push(path.join(resourcesPath, 'resources', 'icon.png'))
-      candidates.push(path.join(resourcesPath, 'resources', 'icon.ico'))
-    }
-  }
-
-  // 2. Relative to the bundled module inside the asar (dev + local builds)
-  if (preferIco) {
-    candidates.push(path.join(__dirname, 'resources', 'icon.ico'))
-    candidates.push(path.join(__dirname, '../resources/icon.ico'))
-    candidates.push(path.join(__dirname, 'resources', 'icon.png'))
-    candidates.push(path.join(__dirname, '../resources/icon.png'))
-  } else {
-    candidates.push(path.join(__dirname, 'resources', 'icon.png'))
-    candidates.push(path.join(__dirname, '../resources/icon.png'))
-    candidates.push(path.join(__dirname, 'resources', 'icon.ico'))
-    candidates.push(path.join(__dirname, '../resources/icon.ico'))
-  }
-
-  return candidates
-}
-
-const ICON_CANDIDATES_WIN     = buildIconCandidates(true)
-const ICON_CANDIDATES_DEFAULT = buildIconCandidates(false)
 
 // ============================================================================
 // STATE
@@ -64,13 +25,61 @@ let cachedIconPath: string | null | undefined
 // UTILITY FUNCTIONS
 // ============================================================================
 
-const resolveIconPath = (): string | null => {
-  const candidates = process.platform === 'win32' ? ICON_CANDIDATES_WIN : ICON_CANDIDATES_DEFAULT
+/**
+ * Build an ordered list of icon file paths to try.
+ * Called at resolve-time (not module init) so process.resourcesPath is available.
+ */
+const buildIconCandidates = (): string[] => {
+  const preferIco = process.platform === 'win32'
+  const seen = new Set<string>()
+  const candidates: string[] = []
 
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return candidate
+  const add = (candidate: string): void => {
+    const normalized = path.resolve(candidate)
+    if (seen.has(normalized)) return
+    seen.add(normalized)
+    candidates.push(normalized)
   }
 
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
+
+  // Packaged app — real filesystem path outside asar (most reliable on Windows)
+  if (resourcesPath) {
+    if (preferIco) {
+      add(path.join(resourcesPath, 'resources', 'icon.ico'))
+      add(path.join(resourcesPath, 'resources', 'icon.png'))
+    } else {
+      add(path.join(resourcesPath, 'resources', 'icon.png'))
+      add(path.join(resourcesPath, 'resources', 'icon.ico'))
+    }
+  }
+
+  // Dev mode — project root resources/ (always populated by predev / generate:icons)
+  add(path.join(process.cwd(), 'resources', 'icon.ico'))
+  add(path.join(process.cwd(), 'resources', 'icon.png'))
+
+  // Vite build output copies icons here
+  add(path.join(__dirname, 'resources', 'icon.ico'))
+  add(path.join(__dirname, '../resources/icon.ico'))
+  add(path.join(__dirname, '../../resources/icon.ico'))
+  add(path.join(__dirname, 'resources', 'icon.png'))
+  add(path.join(__dirname, '../resources/icon.png'))
+
+  // Packaged app root (inside asar fallback)
+  try {
+    add(path.join(app.getAppPath(), 'resources', 'icon.ico'))
+    add(path.join(app.getAppPath(), 'resources', 'icon.png'))
+  } catch {
+    // app not ready yet — skip
+  }
+
+  return candidates
+}
+
+const resolveIconPath = (): string | null => {
+  for (const candidate of buildIconCandidates()) {
+    if (fs.existsSync(candidate)) return candidate
+  }
   return null
 }
 
@@ -78,7 +87,6 @@ const buildAppIconImage = (iconPath: string): NativeImage => {
   const image = nativeImage.createFromPath(iconPath)
   if (image.isEmpty()) return nativeImage.createEmpty()
 
-  // Windows title bar / taskbar buttons render small sizes from the ICO asset.
   if (process.platform === 'win32' && iconPath.endsWith('.png')) {
     return image.resize({ width: 256, height: 256 })
   }
@@ -98,11 +106,26 @@ export function getAppIconPath(): string | null {
   return cachedIconPath
 }
 
-/** Returns the InternalX window/taskbar/dock icon (loader pinwheel). */
+/** Returns the InternalX window/taskbar/dock icon. */
 export function getAppIcon(): NativeImage {
   if (!cachedAppIcon || cachedAppIcon.isEmpty()) {
     const iconPath = getAppIconPath()
     cachedAppIcon = iconPath ? buildAppIconImage(iconPath) : nativeImage.createEmpty()
   }
   return cachedAppIcon
+}
+
+/**
+ * On Windows the taskbar button icon is most reliable when BrowserWindow
+ * receives an absolute path to a .ico file (not a NativeImage object).
+ */
+export function getWindowsWindowIcon(): string | undefined {
+  const iconPath = getAppIconPath()
+  if (!iconPath) return undefined
+  if (iconPath.endsWith('.ico')) return iconPath
+
+  const icoCandidate = iconPath.replace(/\.png$/i, '.ico')
+  if (fs.existsSync(icoCandidate)) return icoCandidate
+
+  return iconPath
 }

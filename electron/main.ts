@@ -5,7 +5,7 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { getAppIcon, getAppIconPath } from './core/app-icon.js'
+import { getAppIcon, getAppIconPath, getWindowsWindowIcon } from './core/app-icon.js'
 import { registerIpcHandlers } from './core/ipc.js'
 import { cleanupOnExit } from './core/automation.js'
 import { createTray, destroyTray } from './core/tray.js'
@@ -25,6 +25,12 @@ const APP_HEIGHT = 800
 const APP_MIN_HEIGHT = 700
 const APP_MAX_HEIGHT = 850
 const WINDOWS_APP_USER_MODEL_ID = 'com.internalx.app'
+
+// Must be set before app.whenReady() so Windows groups the taskbar entry
+// under our AppUserModelID and uses the window icon we provide.
+if (process.platform === 'win32') {
+  app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID)
+}
 
 // ============================================================================
 // STATE
@@ -58,7 +64,14 @@ function applyAppIcon(): void {
 function createWindow(): void {
   const appIcon = getAppIcon()
   const appIconPath = getAppIconPath()
-  const windowIcon = appIconPath ?? (appIcon.isEmpty() ? undefined : appIcon)
+  const windowsIconPath = getWindowsWindowIcon()
+
+  // Windows: pass absolute .ico path string — most reliable for taskbar icon.
+  // Other platforms: NativeImage or path fallback.
+  const windowIcon =
+    process.platform === 'win32'
+      ? windowsIconPath
+      : appIconPath ?? (appIcon.isEmpty() ? undefined : appIcon)
 
   mainWindow = new BrowserWindow({
     width: APP_WIDTH,
@@ -88,7 +101,19 @@ function createWindow(): void {
 
   if (!appIcon.isEmpty()) {
     mainWindow.setIcon(appIcon)
+  } else if (windowsIconPath) {
+    mainWindow.setIcon(windowsIconPath)
   }
+
+  mainWindow.once('ready-to-show', () => {
+    // Re-apply on show — Windows sometimes drops the icon set at construction
+    // when the window was created hidden (tray / --hidden startup).
+    if (windowsIconPath) {
+      mainWindow?.setIcon(windowsIconPath)
+    } else if (!appIcon.isEmpty()) {
+      mainWindow?.setIcon(appIcon)
+    }
+  })
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
@@ -118,10 +143,6 @@ app.setName(APP_NAME)
 
 if (process.platform === 'darwin') {
   app.setAboutPanelOptions({ applicationName: APP_NAME })
-}
-
-if (process.platform === 'win32') {
-  app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID)
 }
 
 app.whenReady().then(() => {
