@@ -16,49 +16,50 @@ const hasElectronAPI = (): boolean =>
 // ============================================================================
 
 /**
- * Manages the activity log displayed in the UI.
+ * Manages the developer / debug log panel entries.
  *
- * On mount:  fetches all historical entries from the log file on disk via IPC.
- * At runtime: prepends new entries pushed live from the Main process.
- * Both sources are deduplicated by order — historical entries are the base,
- * live entries are prepended as they arrive.
+ * On mount:  fetches buffered entries from the Main process ring buffer.
+ * At runtime: appends new entries pushed live from Main (newest at bottom).
+ *
+ * The dev log captures internal events: Python spawn, stdout/stderr,
+ * exit codes, IPC events, tray changes — useful for debugging without
+ * attaching a full Node debugger.
  */
-const useActivityLog = () => {
+const useDevLog = () => {
   // ── STATE ─────────────────────────────────────────────────────────────────
   const [entries, setEntries] = useState<string[]>([])
 
-  // ── EFFECTS — Load historical entries on mount ────────────────────────────
+  // ── EFFECTS — Load buffered entries on mount ──────────────────────────────
   useEffect(() => {
     if (!hasElectronAPI()) return
 
-    window.electronAPI!.log.getEntries().then((historical) => {
+    window.electronAPI!.devLog.getEntries().then((historical) => {
       if (historical.length > 0) {
         setEntries(historical)
       }
     }).catch(() => {
-      // Log file unreadable or IPC unavailable — start with empty state
+      // IPC unavailable — start with empty state
     })
   }, [])
 
-  // ── EFFECTS — Subscribe to live entries pushed from Main ──────────────────
+  // ── EFFECTS — Subscribe to live entries from Main ─────────────────────────
   useEffect(() => {
     if (!hasElectronAPI()) return
 
-    const unsubscribe = window.electronAPI!.log.onNewEntry(({ entry }) => {
-      // Prepend so newest entries appear first (matching historical order)
-      setEntries((prev) => [entry, ...prev])
+    const unsubscribe = window.electronAPI!.devLog.onNewEntry(({ entry }) => {
+      // Append newest at the end so the log reads top-to-bottom chronologically
+      setEntries((prev) => [...prev, entry])
     })
 
     return unsubscribe
   }, [])
 
   // ── ACTIONS ───────────────────────────────────────────────────────────────
-  const exportLog = useCallback(async (): Promise<void> => {
-    if (!hasElectronAPI()) return
-    await window.electronAPI!.log.export()
+  const clearEntries = useCallback(() => {
+    setEntries([])
   }, [])
 
-  return { entries, exportLog }
+  return { entries, clearEntries }
 }
 
-export default useActivityLog
+export default useDevLog

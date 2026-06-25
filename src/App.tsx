@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, ScrollText } from 'lucide-react'
+import { Download, ScrollText, Terminal, Trash2 } from 'lucide-react'
 import {
   Alert,
   Badge,
@@ -28,6 +28,7 @@ import { cn } from '@/utils/cn'
 import { formatDuration, parseTimerInput, timerToSeconds } from '@/utils/format'
 import useAutomation from '@/hooks/useAutomation'
 import useActivityLog from '@/hooks/useActivityLog'
+import useDevLog from '@/hooks/useDevLog'
 import useVoice from '@/hooks/useVoice'
 
 // ============================================================================
@@ -151,6 +152,7 @@ const App = () => {
   const [shutdownCountdown, setShutdownCountdown] = useState(30)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showActivityLog, setShowActivityLog] = useState(false)
+  const [showDevLog, setShowDevLog] = useState(false)
 
   // ============================================================================
   // CUSTOM HOOKS - IPC Bridge
@@ -176,6 +178,7 @@ const App = () => {
   })
 
   const { entries: logEntries, exportLog } = useActivityLog()
+  const { entries: devLogEntries, clearEntries: clearDevLogEntries } = useDevLog()
 
   const { announceCountdownStart, announceStarted, announceStopped, announceShutdown } = useVoice()
 
@@ -274,6 +277,10 @@ const App = () => {
     setShowActivityLog((prev) => !prev)
   }, [])
 
+  const handleToggleDevLog = useCallback(() => {
+    setShowDevLog((prev) => !prev)
+  }, [])
+
   // ============================================================================
   // EFFECTS - Countdown Timer
   // ============================================================================
@@ -339,6 +346,8 @@ const App = () => {
 
     if (shutdownCountdown <= 0) {
       setShowShutdownModal(false)
+      // Dispatch OS shutdown via IPC — Main runs `shutdown /s /t 0`
+      window.electronAPI?.postStop?.executeShutdown()
       return
     }
 
@@ -401,6 +410,8 @@ const App = () => {
 
             <div className="flex items-center gap-2 flex-shrink-0">
               <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+
+              {/* Activity Log toggle */}
               <Tooltip content={activityLogTooltip} maxWidth={220} placement="bottom">
                 <button
                   type="button"
@@ -417,6 +428,26 @@ const App = () => {
                   )}
                 >
                   <ScrollText size={16} strokeWidth={2} />
+                </button>
+              </Tooltip>
+
+              {/* Developer log toggle */}
+              <Tooltip content="Developer log — internal debug events" maxWidth={220} placement="bottom">
+                <button
+                  type="button"
+                  onClick={handleToggleDevLog}
+                  aria-label={showDevLog ? 'Hide developer log' : 'Show developer log'}
+                  aria-pressed={showDevLog}
+                  className={cn(
+                    'inline-flex items-center justify-center w-8 h-8 rounded-editorial border-[1.5px]',
+                    'transition-colors duration-150',
+                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-editorial-primary focus-visible:outline-offset-2',
+                    showDevLog
+                      ? 'border-[#56b6c2] bg-[#0f1117] text-[#56b6c2]'
+                      : 'border-editorial-border text-editorial-muted hover:bg-editorial-secondary hover:text-editorial-text-primary',
+                  )}
+                >
+                  <Terminal size={16} strokeWidth={2} />
                 </button>
               </Tooltip>
             </div>
@@ -606,13 +637,80 @@ const App = () => {
           )}
         </main>
 
-        {/* Countdown Overlay — bottom-right, unobtrusive */}
+        {/* Countdown Overlay */}
         {isCountdown && countdownSeconds !== null && (
           <div
-            className="absolute bottom-3 right-4 font-body text-[10px] text-editorial-muted opacity-50 pointer-events-none select-none"
+            className="absolute bottom-4 right-5 flex flex-row items-center gap-2 pointer-events-none select-none"
             aria-live="polite"
           >
-            Starting in {countdownSeconds}s
+            <span className="font-body text-[10px] font-bold uppercase tracking-eyebrow text-editorial-muted opacity-70">
+              Starting in
+            </span>
+            <span className="font-body text-[38px] font-bold leading-none text-editorial-primary opacity-80 tabular-nums">
+              {countdownSeconds}s
+            </span>
+          </div>
+        )}
+
+        {/* Developer Log Panel — terminal-style overlay above main content */}
+        {showDevLog && (
+          <div className="absolute inset-x-0 bottom-0 top-[57px] z-30 flex flex-col bg-[#0f1117] border-t border-[#2a2a3a]">
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a2a3a] flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <Terminal size={14} className="text-[#56b6c2]" strokeWidth={2} />
+                <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-[#56b6c2]">
+                  Developer Log
+                </span>
+                <span className="font-mono text-[10px] text-[#4a4a5a] ml-1">
+                  {devLogEntries.length} entries
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={clearDevLogEntries}
+                aria-label="Clear developer log"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono text-[#6a6a7a] hover:text-[#e06c75] hover:bg-[#1a1a2a] transition-colors duration-150"
+              >
+                <Trash2 size={11} strokeWidth={2} />
+                Clear
+              </button>
+            </div>
+
+            {/* Entries — newest at bottom, auto-scroll */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-0">
+              {devLogEntries.length === 0 ? (
+                <p className="font-mono text-[11px] text-[#4a4a5a] text-center py-8">
+                  No events yet. Start automation to see debug output.
+                </p>
+              ) : (
+                <ul className="divide-y divide-[#1a1a2a]">
+                  {devLogEntries.map((entry, idx) => {
+                    const levelMatch = entry.match(/\[(\w+)\]/)
+                    const level = levelMatch ? levelMatch[1] : 'INFO'
+                    const levelColor =
+                      level === 'ERROR'  ? 'text-[#e06c75]' :
+                      level === 'WARN'   ? 'text-[#f0c674]' :
+                      level === 'SCRIPT' ? 'text-[#56b6c2]' :
+                      level === 'STDERR' ? 'text-[#d19a66]' :
+                                           'text-[#8892a4]'
+                    return (
+                      <li
+                        key={idx}
+                        className="px-3 py-1 font-mono text-[11px] text-[#abb2bf] hover:bg-[#1a1a2a] transition-colors duration-75 leading-relaxed"
+                      >
+                        <span className={cn('font-bold mr-1', levelColor)}>
+                          {entry.substring(0, entry.indexOf(']', entry.indexOf('[', 9)) + 1)}
+                        </span>
+                        <span className="text-[#abb2bf]">
+                          {entry.substring(entry.indexOf(']', entry.indexOf('[', 9)) + 2)}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
           </div>
         )}
 
