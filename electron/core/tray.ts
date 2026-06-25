@@ -20,7 +20,7 @@ type GetWindow = () => BrowserWindow | null
 let tray: Tray | null = null
 let _getWindow: GetWindow | null = null
 let _isRunning = false
-let _mode = 'advanced'
+let _mode = 'basic'
 
 // ============================================================================
 // CONSTANTS — SVG icon definitions

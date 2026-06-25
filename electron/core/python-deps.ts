@@ -23,7 +23,7 @@ type LogCallback = (entry: string) => void
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const REQUIREMENTS_FILE = 'requirements.txt'
-const PIP_INSTALL_TIMEOUT_MS = 35 * 60 * 1000
+const PIP_INSTALL_TIMEOUT_MS = 10 * 60 * 1000
 
 function requirementsExists(scriptsDir: string): boolean {
   return fs.existsSync(path.join(scriptsDir, REQUIREMENTS_FILE))

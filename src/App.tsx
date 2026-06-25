@@ -117,7 +117,7 @@ const App = () => {
   // STATE - Core Data
   // ============================================================================
   const [status, setStatus] = useState<AutomationStatus>('stopped')
-  const [mode, setMode] = useState<AutomationMode>('advanced')
+  const [mode, setMode] = useState<AutomationMode>('basic')
   const [timerHours, setTimerHours] = useState('0')
   const [timerMinutes, setTimerMinutes] = useState('0')
   const [closeTracker, setCloseTracker] = useState(false)
