@@ -22,18 +22,67 @@ type LogCallback = (entry: string) => void
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-const SCRIPTS_DIR_DEV = path.resolve(__dirname, '../scripts')
 const REQUIREMENTS_FILE = 'requirements.txt'
+const PIP_INSTALL_TIMEOUT_MS = 10 * 60 * 1000
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
+function requirementsExists(scriptsDir: string): boolean {
+  return fs.existsSync(path.join(scriptsDir, REQUIREMENTS_FILE))
+}
+
+/**
+ * Resolve the Python scripts directory across dev, bundled, and packaged builds.
+ * Picks the first candidate that contains requirements.txt (Windows + macOS).
+ */
+function buildScriptsDirCandidates(): string[] {
+  const candidates: string[] = []
+  const seen = new Set<string>()
+
+  const addCandidate = (dir: string): void => {
+    const normalized = path.resolve(dir)
+    if (seen.has(normalized)) return
+    seen.add(normalized)
+    candidates.push(normalized)
+  }
+
+  // Dev / npm run dev — cwd is always the project root
+  addCandidate(path.resolve(process.cwd(), 'scripts'))
+
+  // Packaged Electron app (electron-builder resources)
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
+  if (resourcesPath) {
+    addCandidate(path.join(resourcesPath, 'scripts'))
+  }
+
+  // Vite build output copies scripts here for production-like local builds
+  addCandidate(path.resolve(process.cwd(), 'dist-electron', 'scripts'))
+
+  // Relative to bundled main.js (dist-electron/) or split chunk (dist-electron/core/)
+  const moduleDir = __dirname
+  addCandidate(path.join(moduleDir, 'scripts'))
+  addCandidate(path.resolve(moduleDir, '..', 'scripts'))
+  addCandidate(path.resolve(moduleDir, '../..', 'scripts'))
+
+  return candidates
+}
 
 export function getScriptsDir(): string {
-  if (process.env.VITE_DEV_SERVER_URL) return SCRIPTS_DIR_DEV
+  const candidates = buildScriptsDirCandidates()
 
-  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
-  return resourcesPath ? path.join(resourcesPath, 'scripts') : SCRIPTS_DIR_DEV
+  for (const candidate of candidates) {
+    if (requirementsExists(candidate)) {
+      devLog('INFO', `Scripts dir resolved: ${candidate}`)
+      return candidate
+    }
+  }
+
+  const fallback = path.resolve(process.cwd(), 'scripts')
+  devLog('WARN', `Scripts dir fallback (requirements.txt missing): ${fallback}`)
+  devLog('WARN', `Tried: ${candidates.join(' | ')}`)
+  return fallback
+}
+
+export function getRequirementsPath(): string {
+  return path.join(getScriptsDir(), REQUIREMENTS_FILE)
 }
 
 export function detectPythonBinary(): string | null {
@@ -78,44 +127,142 @@ function getMissingModules(pythonBin: string, moduleNames: string[]): string[] {
   return missing
 }
 
-function installPythonDependencies(
+function buildPipInstallArgs(requirementsPath: string, includeBreakSystemPackages: boolean): string[] {
+  const args = [
+    '-m',
+    'pip',
+    'install',
+    '-r',
+    requirementsPath,
+    '--disable-pip-version-check',
+    '--no-input',
+    '--user',
+  ]
+
+  if (includeBreakSystemPackages) {
+    args.push('--break-system-packages')
+  }
+
+  return args
+}
+
+function isExternallyManagedPipError(output: string): boolean {
+  return output.toLowerCase().includes('externally-managed-environment')
+}
+
+function streamPipOutput(
+  chunk: Buffer,
+  isStderr: boolean,
+  buffers: { stdout: string; stderr: string },
+  onLog?: LogCallback,
+): void {
+  const text = chunk.toString()
+
+  if (isStderr) {
+    buffers.stderr += text
+  } else {
+    buffers.stdout += text
+  }
+
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
+  for (const line of lines) {
+    devLog(isStderr ? 'STDERR' : 'INFO', `pip: ${line}`)
+    onLog?.(`pip — ${line}`)
+  }
+}
+
+function runPipInstall(
   pythonBin: string,
   requirementsPath: string,
-): Promise<{ ok: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    const proc = spawn(
-      pythonBin,
-      ['-m', 'pip', 'install', '-r', requirementsPath, '--disable-pip-version-check'],
-      {
-        windowsHide: true,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      },
-    )
+  includeBreakSystemPackages: boolean,
+  onLog?: LogCallback,
+): Promise<{ ok: boolean; error?: string; output: string }> {
+  const pipArgs = buildPipInstallArgs(requirementsPath, includeBreakSystemPackages)
+  const commandLabel = `${pythonBin} ${pipArgs.join(' ')}`
 
-    let stderr = ''
+  devLog('INFO', `Running: ${commandLabel}`)
+  onLog?.(`INFO — Running: ${commandLabel}`)
+
+  return new Promise((resolve) => {
+    const proc = spawn(pythonBin, pipArgs, {
+      windowsHide: true,
+      env: {
+        ...process.env,
+        PIP_DISABLE_PIP_VERSION_CHECK: '1',
+        PYTHONUNBUFFERED: '1',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+
+    const buffers = { stdout: '', stderr: '' }
+    let settled = false
+
+    const finish = (result: { ok: boolean; error?: string; output: string }) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(result)
+    }
+
+    const timer = setTimeout(() => {
+      proc.kill('SIGTERM')
+      const timeoutMessage = `pip install timed out after ${PIP_INSTALL_TIMEOUT_MS / 1000}s`
+      devLog('ERROR', timeoutMessage)
+      finish({
+        ok: false,
+        error: `${timeoutMessage}. Try manually: ${commandLabel}`,
+        output: `${buffers.stdout}\n${buffers.stderr}`,
+      })
+    }, PIP_INSTALL_TIMEOUT_MS)
+
+    proc.stdout?.on('data', (data: Buffer) => {
+      streamPipOutput(data, false, buffers, onLog)
+    })
 
     proc.stderr?.on('data', (data: Buffer) => {
-      stderr += data.toString()
+      streamPipOutput(data, true, buffers, onLog)
     })
 
     proc.on('error', (err) => {
-      resolve({ ok: false, error: err.message })
+      finish({ ok: false, error: err.message, output: buffers.stderr })
     })
 
     proc.on('close', (code) => {
+      const combinedOutput = `${buffers.stderr}\n${buffers.stdout}`.trim()
+
       if (code === 0) {
-        resolve({ ok: true })
+        finish({ ok: true, output: combinedOutput })
         return
       }
 
-      const trimmedStderr = stderr.trim()
-      const errorMessage = trimmedStderr.length > 0
-        ? trimmedStderr
+      const errorMessage = combinedOutput.length > 0
+        ? combinedOutput
         : `pip install failed (exit code: ${code ?? 'unknown'})`
 
-      resolve({ ok: false, error: errorMessage })
+      finish({ ok: false, error: errorMessage, output: combinedOutput })
     })
   })
+}
+
+async function installPythonDependencies(
+  pythonBin: string,
+  requirementsPath: string,
+  onLog?: LogCallback,
+): Promise<{ ok: boolean; error?: string }> {
+  const firstAttempt = await runPipInstall(pythonBin, requirementsPath, false, onLog)
+
+  if (firstAttempt.ok) {
+    return { ok: true }
+  }
+
+  if (process.platform === 'darwin' && isExternallyManagedPipError(firstAttempt.output)) {
+    devLog('WARN', 'Retrying pip install with --break-system-packages for macOS Homebrew Python')
+    onLog?.('WARN — Retrying pip install with --break-system-packages')
+    const retryAttempt = await runPipInstall(pythonBin, requirementsPath, true, onLog)
+    return { ok: retryAttempt.ok, error: retryAttempt.error }
+  }
+
+  return { ok: false, error: firstAttempt.error }
 }
 
 // ============================================================================
@@ -137,10 +284,11 @@ export function checkPythonPrerequisites(): PrerequisitesCheckResult {
   }
 
   const scriptsDir = getScriptsDir()
-  const requirementsPath = path.join(scriptsDir, REQUIREMENTS_FILE)
+  const requirementsPath = getRequirementsPath()
 
   if (!fs.existsSync(requirementsPath)) {
-    const message = `requirements.txt not found at: ${requirementsPath}`
+    const tried = buildScriptsDirCandidates().join(' | ')
+    const message = `requirements.txt not found at: ${requirementsPath}. Tried: ${tried}`
     devLog('ERROR', message)
     return {
       ready: false,
@@ -187,10 +335,11 @@ export async function installPythonPrerequisites(
   }
 
   const scriptsDir = getScriptsDir()
-  const requirementsPath = path.join(scriptsDir, REQUIREMENTS_FILE)
+  const requirementsPath = getRequirementsPath()
 
   if (!fs.existsSync(requirementsPath)) {
-    const message = `requirements.txt not found at: ${requirementsPath}`
+    const tried = buildScriptsDirCandidates().join(' | ')
+    const message = `requirements.txt not found at: ${requirementsPath}. Tried: ${tried}`
     devLog('ERROR', message)
     return { success: false, error: message }
   }
@@ -199,7 +348,7 @@ export async function installPythonPrerequisites(
   writeLog(installingEntry)
   onLog?.(installingEntry)
 
-  const installResult = await installPythonDependencies(pythonBin, requirementsPath)
+  const installResult = await installPythonDependencies(pythonBin, requirementsPath, onLog)
   if (!installResult.ok) {
     const manualHint = `Run manually: ${pythonBin} -m pip install -r "${requirementsPath}"`
     const error = installResult.error ?? 'Failed to install Python packages'
