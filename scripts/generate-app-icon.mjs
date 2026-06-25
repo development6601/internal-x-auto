@@ -13,7 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 const SVG_PATH = path.join(ROOT, 'public', 'app-icon.svg')
 const OUT_DIR = path.join(ROOT, 'resources')
-const ICO_SIZES = [16, 32, 48, 64, 128, 256]
+const ICO_SIZES = [16, 20, 24, 32, 40, 48, 64, 128, 256]
 const MAC_ICON_SIZE = 512
 
 const renderPng = (svg, size) => {
