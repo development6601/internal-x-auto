@@ -19,9 +19,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const APP_WIDTH = 420
 const APP_MIN_WIDTH = 350
 const APP_MAX_WIDTH = 450
-const APP_HEIGHT = 720
+const APP_HEIGHT = 800
 const APP_MIN_HEIGHT = 700
-const APP_MAX_HEIGHT = 750
+const APP_MAX_HEIGHT = 850
 
 // ============================================================================
 // STATE
@@ -55,9 +55,12 @@ function createWindow(): void {
     // Start hidden when launched at login (--hidden flag)
     show: !shouldStartHidden(),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      // sandbox: false is required to allow ESM preload scripts.
+      // contextIsolation remains true so contextBridge is enforced.
+      sandbox: false,
     },
   })
 

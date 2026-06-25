@@ -17,14 +17,14 @@ type Unsubscribe = () => void
 // UTILITY FUNCTIONS
 // ============================================================================
 
-/** Subscribe to a Main → Renderer channel and return an unsubscribe fn. */
+/** Subscribe to a Main → Renderer channel. Returns an unsubscribe fn. */
 function on<T>(channel: string, callback: (payload: T) => void): Unsubscribe {
   const handler = (_event: IpcRendererEvent, payload: T) => callback(payload)
   ipcRenderer.on(channel, handler)
   return () => ipcRenderer.removeListener(channel, handler)
 }
 
-/** Subscribe to a channel that carries no payload. */
+/** Subscribe to a payload-less Main → Renderer channel. */
 function onVoid(channel: string, callback: () => void): Unsubscribe {
   const handler = () => callback()
   ipcRenderer.on(channel, handler)
@@ -39,22 +39,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ── Automation ─────────────────────────────────────────────────────────────
   automation: {
-    /** Fire-and-forget: spawn Python with the given config after countdown. */
     start: (payload: StartPayload): void => {
       ipcRenderer.send(IPC_CHANNELS.AUTOMATION_START, payload)
     },
-
-    /** Fire-and-forget: kill Python and log the stop reason + duration. */
     stop: (payload: StopPayload): void => {
       ipcRenderer.send(IPC_CHANNELS.AUTOMATION_STOP, payload)
     },
-
-    /** Subscribe to automation status updates from Main. */
     onStatus: (cb: (payload: StatusPayload) => void): Unsubscribe => {
       return on<StatusPayload>(IPC_CHANNELS.AUTOMATION_STATUS, cb)
     },
-
-    /** Subscribe to automation error messages from Main. */
     onError: (cb: (payload: ErrorPayload) => void): Unsubscribe => {
       return on<ErrorPayload>(IPC_CHANNELS.AUTOMATION_ERROR, cb)
     },
@@ -62,9 +55,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ── Activity log ───────────────────────────────────────────────────────────
   log: {
-    /** Subscribe to new log entries pushed from Main. */
+    /** Subscribe to new live log entries pushed from Main. */
     onNewEntry: (cb: (payload: LogEntryPayload) => void): Unsubscribe => {
       return on<LogEntryPayload>(IPC_CHANNELS.LOG_NEW_ENTRY, cb)
+    },
+
+    /** Fetch all historical log entries from disk (newest first). Called on mount. */
+    getEntries: (): Promise<string[]> => {
+      return ipcRenderer.invoke(IPC_CHANNELS.LOG_GET_ENTRIES)
     },
 
     /** Open a save dialog and write the log to the chosen path. */
@@ -73,19 +71,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
 
+  // ── Post-stop actions ──────────────────────────────────────────────────────
+  postStop: {
+    /** Tell Main to execute `shutdown /s /t 0` after the 30 s countdown elapses. */
+    executeShutdown: (): void => {
+      ipcRenderer.send(IPC_CHANNELS.POST_STOP_SHUTDOWN)
+    },
+  },
+
+  // ── Developer log ──────────────────────────────────────────────────────────
+  devLog: {
+    /** Fetch buffered dev log entries from Main (oldest first). Called on panel open. */
+    getEntries: (): Promise<string[]> => {
+      return ipcRenderer.invoke(IPC_CHANNELS.DEV_LOG_GET_ENTRIES)
+    },
+    /** Subscribe to live dev log entries pushed from Main as they happen. */
+    onNewEntry: (cb: (payload: { entry: string }) => void): Unsubscribe => {
+      return on<{ entry: string }>(IPC_CHANNELS.DEV_LOG_NEW_ENTRY, cb)
+    },
+  },
+
   // ── Tray ───────────────────────────────────────────────────────────────────
   tray: {
-    /** Subscribe to "Start Automation" from tray right-click menu. */
     onRequestStart: (cb: () => void): Unsubscribe => {
       return onVoid(IPC_CHANNELS.TRAY_REQUEST_START, cb)
     },
-
-    /** Subscribe to "Stop Automation" from tray right-click menu. */
     onRequestStop: (cb: () => void): Unsubscribe => {
       return onVoid(IPC_CHANNELS.TRAY_REQUEST_STOP, cb)
     },
-
-    /** Notify Main when the mode radio changes so the tray menu label stays in sync. */
     notifyModeChanged: (mode: string): void => {
       ipcRenderer.send(IPC_CHANNELS.APP_MODE_CHANGED, { mode })
     },

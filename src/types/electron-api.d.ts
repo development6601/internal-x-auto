@@ -43,7 +43,15 @@ interface ElectronAPI {
   }
   log: {
     onNewEntry: (cb: (payload: LogEntryPayload) => void) => Unsubscribe
+    getEntries: () => Promise<string[]>
     export: () => Promise<ExportLogResult>
+  }
+  devLog: {
+    getEntries: () => Promise<string[]>
+    onNewEntry: (cb: (payload: { entry: string }) => void) => Unsubscribe
+  }
+  postStop: {
+    executeShutdown: () => void
   }
   tray: {
     onRequestStart: (cb: () => void) => Unsubscribe
