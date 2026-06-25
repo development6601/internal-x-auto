@@ -5,6 +5,7 @@
 import { execSync, spawn } from 'child_process'
 import type { ChildProcess } from 'child_process'
 import path from 'path'
+import { systemPreferences } from 'electron'
 import { devLog } from './dev-logger.js'
 import { writeLog } from './logger.js'
 import { detectPythonBinary, getScriptsDir } from './python-deps.js'
@@ -38,6 +39,32 @@ let _onLog: LogCallback | null = null
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
+
+/**
+ * On macOS, pyautogui requires the Accessibility permission to simulate
+ * keyboard/mouse input. Check silently (no system prompt) and emit a
+ * warning into the activity log so the user knows why automation may fail.
+ */
+function warnIfAccessibilityNotGranted(onLog: LogCallback): void {
+  if (process.platform !== 'darwin') return
+
+  try {
+    const trusted = systemPreferences.isTrustedAccessibilityClient(false)
+    if (!trusted) {
+      const entry =
+        'WARN — macOS Accessibility permission not granted. ' +
+        'Keyboard/mouse simulation may be blocked. ' +
+        'Open System Settings → Privacy & Security → Accessibility and enable InternalX.'
+      writeLog(entry)
+      onLog(entry)
+      devLog('WARN', entry)
+    } else {
+      devLog('INFO', 'macOS Accessibility permission: granted')
+    }
+  } catch (err) {
+    devLog('WARN', `Accessibility check failed: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
 
 function getScriptFilename(mode: 'basic' | 'advanced'): string {
   return mode === 'basic' ? 'basic_mode.py' : 'advanced_mode.py'
@@ -96,6 +123,9 @@ export function startAutomation(
 
   devLog('INFO', `Spawning: ${pythonBin} ${scriptPath} --mode ${payload.mode} --duration ${payload.durationSeconds} --shutdown ${payload.shutdown}`)
   devLog('INFO', `spawn cwd: ${scriptsDir}`)
+
+  // macOS only: warn if Accessibility permission is missing (pyautogui needs it)
+  warnIfAccessibilityNotGranted(onLog)
 
   try {
     child = spawn(

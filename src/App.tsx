@@ -60,7 +60,7 @@ const MODE_OPTIONS: ModeOption[] = [
     label: 'Basic',
     tooltip: (
       <>
-        Browser tab and editor switching only. No application switching (Alt+Tab).
+        Browser tab and editor switching only. No application switching.
       </>
     ),
   },
@@ -69,7 +69,8 @@ const MODE_OPTIONS: ModeOption[] = [
     label: 'Advanced',
     tooltip: (
       <>
-        Full activity simulation across applications. Includes Alt+Tab between browser and editor.
+        Full activity simulation across applications. Includes application switching
+        (Alt+Tab on Windows, Cmd+Tab on macOS) between browser and editor.
       </>
     ),
   },

@@ -4,7 +4,7 @@ InternalX — Basic Automation Mode
 Simulates browser/editor activity using keyboard shortcuts and scroll.
 No Alt+Tab — only in-app navigation.
 
-Actions  : Ctrl+Tab, Scroll up/down, Arrow keys, Page Up/Down
+Actions  : Ctrl+Tab, Scroll up/down, Arrow keys, Page Up/Down (no app switching)
 Interval : 0.2 s – 0.5 s per action
 Idle     : 15 s – 25 s  (≈ 8 % of outer loop iterations)
 

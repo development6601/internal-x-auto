@@ -1,11 +1,12 @@
 """
 InternalX — Advanced Automation Mode
 
-Simulates full desktop activity including application switching (Alt+Tab).
+Simulates full desktop activity including application switching.
 Wider timing variance and more frequent/longer idle windows make the
 pattern genuinely unpredictable.
 
-Actions  : All Basic actions + Alt+Tab
+Actions  : All Basic actions + application switching
+           (Alt+Tab on Windows/Linux, Cmd+Tab on macOS)
 Interval : 0.2 s – 5.0 s per action  (wider than Basic)
 Idle     : 20 s – 60 s  (≈ 20 % of outer loop iterations, longer than Basic)
 

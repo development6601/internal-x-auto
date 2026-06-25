@@ -5,6 +5,13 @@ All pyautogui calls are wrapped in safe_action() so a single failing
 call never crashes the main loop.  sleep_interruptible() checks the
 is_running flag every POLL_INTERVAL so the process exits promptly on
 SIGTERM (or Windows taskkill).
+
+Platform notes
+--------------
+- Windows : Alt+Tab switches applications; Ctrl+Tab switches tabs/files.
+- macOS   : Cmd+Tab switches applications; Ctrl+Tab switches tabs/files
+            (Ctrl+Tab is natively supported in Chrome, Firefox, Cursor,
+            VSCode, and most Electron apps on macOS).
 """
 
 import random
@@ -21,11 +28,19 @@ pyautogui.FAILSAFE = False
 # Keeps SIGTERM response latency under ~50 ms.
 POLL_INTERVAL: float = 0.05
 
+# Platform flag — resolved once at import time.
+_IS_MACOS: bool = sys.platform == 'darwin'
+_IS_WINDOWS: bool = sys.platform == 'win32'
+
 
 # ── Individual actions ────────────────────────────────────────────────────────
 
 def action_ctrl_tab() -> None:
-    """Switch browser tab or editor file."""
+    """Switch browser tab or editor file.
+
+    Ctrl+Tab works on both Windows and macOS inside Chrome, Firefox,
+    Cursor, VSCode, and most Electron apps.
+    """
     pyautogui.hotkey('ctrl', 'tab')
 
 
@@ -63,14 +78,21 @@ def action_arrow_sequence() -> None:
         pyautogui.press(key)
 
 
-def action_alt_tab() -> None:
-    """Switch active application window.  Advanced mode only."""
-    pyautogui.hotkey('alt', 'tab')
+def action_app_switch() -> None:
+    """Switch the active application window.  Advanced mode only.
+
+    - Windows / Linux : Alt+Tab
+    - macOS           : Cmd+Tab  (pyautogui key name: 'command')
+    """
+    if _IS_MACOS:
+        pyautogui.hotkey('command', 'tab')
+    else:
+        pyautogui.hotkey('alt', 'tab')
 
 
 # ── Action pools ──────────────────────────────────────────────────────────────
 
-#: Actions available in Basic mode — no Alt+Tab
+#: Actions available in Basic mode — no application switching
 BASIC_POOL: List[Callable[[], None]] = [
     action_ctrl_tab,
     action_scroll_up,
@@ -85,10 +107,11 @@ BASIC_POOL: List[Callable[[], None]] = [
     action_arrow_sequence,  # weighted: sequences look natural
 ]
 
-#: Actions available in Advanced mode — everything + Alt+Tab
+#: Actions available in Advanced mode — everything + application switching
+#: Uses Alt+Tab on Windows/Linux, Cmd+Tab on macOS.
 ADVANCED_POOL: List[Callable[[], None]] = BASIC_POOL + [
-    action_alt_tab,
-    action_alt_tab,         # weighted: app switching is prominent
+    action_app_switch,
+    action_app_switch,      # weighted: app switching is prominent
 ]
 
 
