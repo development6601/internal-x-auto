@@ -76,7 +76,7 @@ const Checkbox = ({
         {tooltip && (
           <Tooltip content={tooltip} maxWidth={240}>
             <span
-              className="inline-flex items-center justify-center flex-shrink-0 leading-none"
+              className="flex items-center justify-center flex-shrink-0 leading-none"
               onClick={(event) => event.preventDefault()}
             >
               <InfoHint />

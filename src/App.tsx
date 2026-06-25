@@ -21,6 +21,7 @@ import {
 import {
   ACTIVITY_LOG_TOOLTIP,
   APP_MAX_WIDTH,
+  APP_NAME,
   HIDE_ACTIVITY_LOG_TOOLTIP,
 } from '@/constants/app.constants'
 import type { AutomationMode, AutomationStatus } from '@/types/automation.types'
@@ -45,13 +46,9 @@ interface ModeOption {
 // CONSTANTS
 // ============================================================================
 
-const APP_NAME = 'InternalX'
-
 const NO_TIMER_TOOLTIP = (
   <>
-    No stop timer set.
-    <br />
-    Automation will run indefinitely until manually stopped.
+    No stop timer set. Automation will run indefinitely until manually stopped.
   </>
 )
 
@@ -61,9 +58,7 @@ const MODE_OPTIONS: ModeOption[] = [
     label: 'Basic',
     tooltip: (
       <>
-        Browser tab and editor switching only.
-        <br />
-        No application switching (Alt+Tab).
+        Browser tab and editor switching only. No application switching (Alt+Tab).
       </>
     ),
   },
@@ -72,9 +67,7 @@ const MODE_OPTIONS: ModeOption[] = [
     label: 'Advanced',
     tooltip: (
       <>
-        Full activity simulation across applications.
-        <br />
-        Includes Alt+Tab between browser and editor.
+        Full activity simulation across applications. Includes Alt+Tab between browser and editor.
       </>
     ),
   },
@@ -82,17 +75,13 @@ const MODE_OPTIONS: ModeOption[] = [
 
 const CLOSE_UPWORK_TOOLTIP = (
   <>
-    Closes the Upwork Desktop App when automation stops.
-    <br />
-    Graceful close first, then force kill if needed. Check Dev Log for steps.
+    Closes the Upwork Desktop App when automation stops. Graceful close first, then force kill if needed. Check Dev Log for steps.
   </>
 )
 
 const SHUTDOWN_TOOLTIP = (
   <>
-    Shuts down the system after automation ends.
-    <br />
-    Shows a 30-second countdown before shutdown — cancel anytime.
+    Shuts down the system after automation ends. Shows a 30-second countdown before shutdown — cancel anytime.
   </>
 )
 
@@ -355,7 +344,7 @@ const App = () => {
 
     if (shutdownCountdown <= 0) {
       setShowShutdownModal(false)
-      // Dispatch OS shutdown via IPC — Main runs `shutdown /s /t 0`
+      // Dispatch OS shutdown via IPC — Main runs platform-specific shutdown
       window.electronAPI?.postStop?.executeShutdown()
       return
     }
@@ -468,7 +457,7 @@ const App = () => {
           {/* Mode Selector */}
           <Card padding="xs">
             <div className="px-2 pt-2 pb-1">
-              <SectionLabel className="mb-2">Automation Mode</SectionLabel>
+              <SectionLabel className="!mb-2">Automation Mode</SectionLabel>
             </div>
             <RadioGroup
               name="automation-mode"
@@ -551,7 +540,7 @@ const App = () => {
           <Card padding="sm">
             <SectionLabel>Controls</SectionLabel>
             {errorMessage && (
-              <Alert variant="error" title="Error" className="mb-3">
+              <Alert variant="error" title="Error" className="!mb-2">
                 {errorMessage}
               </Alert>
             )}

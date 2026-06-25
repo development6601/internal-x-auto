@@ -82,7 +82,7 @@ const RadioGroup = <T extends string>({
               {option.tooltip && (
                 <Tooltip content={option.tooltip} maxWidth={240}>
                   <span
-                    className="inline-flex items-center justify-center flex-shrink-0 leading-none"
+                    className="flex items-center justify-center flex-shrink-0 leading-none h-full min-h-[24px]"
                     onClick={(event) => event.preventDefault()}
                   >
                     <InfoHint />
