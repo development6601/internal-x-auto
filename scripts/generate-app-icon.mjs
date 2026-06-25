@@ -14,6 +14,7 @@ const ROOT = path.resolve(__dirname, '..')
 const SVG_PATH = path.join(ROOT, 'public', 'app-icon.svg')
 const OUT_DIR = path.join(ROOT, 'resources')
 const ICO_SIZES = [16, 32, 48, 64, 128, 256]
+const MAC_ICON_SIZE = 512
 
 const renderPng = (svg, size) => {
   const resvg = new Resvg(svg, {
@@ -27,9 +28,9 @@ const main = async () => {
   fs.mkdirSync(OUT_DIR, { recursive: true })
 
   const pngBuffers = ICO_SIZES.map((size) => renderPng(svg, size))
-  const png256 = pngBuffers[pngBuffers.length - 1]
+  const png512 = renderPng(svg, MAC_ICON_SIZE)
 
-  fs.writeFileSync(path.join(OUT_DIR, 'icon.png'), png256)
+  fs.writeFileSync(path.join(OUT_DIR, 'icon.png'), png512)
   fs.writeFileSync(path.join(OUT_DIR, 'icon.ico'), await pngToIco(pngBuffers))
 
   console.log(`Generated ${path.join(OUT_DIR, 'icon.png')}`)

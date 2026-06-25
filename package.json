@@ -12,6 +12,10 @@
     "dev": "vite",
     "prebuild": "node scripts/generate-app-icon.mjs",
     "build": "tsc -b && vite build",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run"
@@ -30,6 +34,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
     "jsdom": "^29.1.1",
     "png-to-ico": "^3.0.1",
     "postcss": "^8.4.49",
@@ -39,5 +44,69 @@
     "vite-plugin-electron": "^0.28.8",
     "vite-plugin-electron-renderer": "^0.14.6",
     "vitest": "^4.1.9"
+  },
+  "build": {
+    "appId": "com.internalx.app",
+    "productName": "InternalX",
+    "copyright": "Copyright © InternalX",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "scripts",
+        "to": "scripts",
+        "filter": [
+          "**/*.py",
+          "requirements.txt",
+          "lib/**/*.py"
+        ]
+      },
+      {
+        "from": "electron/scripts",
+        "to": "scripts",
+        "filter": [
+          "**/*.ps1",
+          "**/*.applescript"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico",
+      "installerHeaderIcon": "resources/icon.ico",
+      "shortcutName": "InternalX"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "resources/icon.png",
+      "category": "public.app-category.utilities",
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "dmg": {
+      "title": "InternalX ${version}"
+    }
   }
 }
