@@ -92,7 +92,7 @@ export function detectPythonBinary(): string | null {
 
   for (const bin of candidates) {
     try {
-      execSync(`${bin} --version`, { stdio: 'ignore' })
+      execSync(`${bin} --version`, { stdio: 'ignore', timeout: 5000 })
       return bin
     } catch {
       // try next candidate
@@ -118,7 +118,12 @@ function getMissingModules(pythonBin: string, moduleNames: string[]): string[] {
 
   for (const moduleName of moduleNames) {
     try {
-      execSync(`${pythonBin} -c "import ${moduleName}"`, { stdio: 'ignore' })
+      // 8s timeout per module — prevents hanging on macOS HID/IOKit access
+      // (e.g. the `keyboard` package blocks without root on macOS)
+      execSync(`${pythonBin} -c "import ${moduleName}"`, {
+        stdio: 'ignore',
+        timeout: 8000,
+      })
     } catch {
       missing.push(moduleName)
     }
@@ -136,6 +141,8 @@ function buildPipInstallArgs(requirementsPath: string, includeBreakSystemPackage
     requirementsPath,
     '--disable-pip-version-check',
     '--no-input',
+    '--prefer-binary',    // use pre-built wheels; avoids C compilation hang on macOS
+    '--timeout', '60',   // per-request network timeout
     '--user',
   ]
 
