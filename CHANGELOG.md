@@ -2,23 +2,55 @@
 
 All notable changes to **InternalX** are documented here.
 
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).  
+Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [1.0.4] — 2026-06-25
+
+### Fixed
+
+- **Windows taskbar still showing Electron icon**
+  - `electron/afterpack.cjs` now uses the correct **rcedit v5 API** (`version-string`
+    nested object + dynamic ESM import). The previous flat keys (`product-name`,
+    `file-description`, etc.) were silently ignored by rcedit v5, so the EXE icon
+    and metadata were never applied correctly.
+  - `electron/core/app-icon.ts` resolves icon paths at call-time (not module init),
+    checks `process.cwd()/resources/icon.ico` for dev mode, and exposes
+    `getWindowsWindowIcon()` for an absolute `.ico` path on Windows.
+  - `electron/main.ts` passes an absolute **`.ico` path string** to `BrowserWindow`
+    on Windows (Electron-recommended for taskbar icons), re-applies the icon on
+    `ready-to-show`, and calls `app.setAppUserModelId()` before `app.whenReady()`.
+  - `electron/vite-copy-resources.ts` copies icons on `buildStart` so dev mode has
+    `dist-electron/resources/icon.ico` before Electron launches.
+  - `scripts/generate-app-icon.mjs` — ICO now includes Windows 11 taskbar sizes
+    (20, 24, 40 px) in addition to 16, 32, 48, 64, 128, 256.
+  - `package.json` — added `directories.buildResources: resources` for
+    electron-builder.
+
+### Build
+
+- Windows installer: `release/InternalX-Setup-1.0.4.exe`
+
 ---
 
 ## [1.0.3] — 2026-06-25
 
 ### Fixed
 
-- **App switching now goes strictly to the last used app (2-app back-and-forth)**
-  `action_app_switch()` previously used `pyautogui.hotkey(...)` which chains
-  keyDown+keyUp in a single call and may leave the modifier held a fraction too
-  long on some systems, risking the OS showing the persistent app-switcher overlay
-  and landing on a third app. It now uses an explicit `keyDown` → `press('tab')` →
-  `keyUp` sequence so the modifier is always released immediately after the single
-  Tab tap. This guarantees the OS switches directly to the **most-recently-used
-  previous app** without opening the switcher list — creating a clean VS Code ↔
-  Chrome back-and-forth. A 350 ms settle pause is inserted after each switch so
-  the window manager fully transfers focus before the next action fires.
-  — `scripts/lib/actions.py`: `action_app_switch()`.
+- **App switching limited to 2-app back-and-forth (VS Code ↔ Chrome)**
+  - `action_app_switch()` now uses explicit `keyDown` → `press('tab')` → `keyUp`
+    instead of `pyautogui.hotkey(...)`, so the modifier is released immediately
+    after a single Tab tap. The OS switches to the **most-recently-used previous
+    app** only — no app-switcher overlay, no landing on a third app (e.g. Spotify).
+  - A 350 ms settle pause runs after each switch so focus fully transfers before
+    the next action.
+  - — `scripts/lib/actions.py`
+
+### Build
+
+- Windows installer: `release/InternalX-Setup-1.0.3.exe`
 
 ---
 
@@ -26,52 +58,37 @@ All notable changes to **InternalX** are documented here.
 
 ### Fixed
 
-- **Windows taskbar icon showing Electron** — `signAndEditExecutable: false` was
-  preventing electron-builder's rcedit step from embedding the InternalX icon into
-  the EXE. A new `electron/afterpack.cjs` hook now runs `rcedit` directly after
-  packaging to set the icon, product name, and version metadata on the EXE.
-  Additionally, `resources/icon.ico` and `icon.png` are now copied outside the
-  asar archive via `extraResources` so `mainWindow.setIcon()` loads from the real
-  filesystem (more reliable on Windows than loading from inside the asar).
-  — `electron/afterpack.cjs` (new); `electron/core/app-icon.ts` checks
-  `process.resourcesPath` first; `package.json` build config updated.
+- **Windows taskbar icon showing Electron (initial fix)**
+  - Added `electron/afterpack.cjs` hook to embed icon via rcedit after packaging
+    (`signAndEditExecutable: false` skips electron-builder's step to avoid
+    winCodeSign symlink errors on Windows without Developer Mode).
+  - `resources/icon.ico` and `icon.png` copied outside asar via `extraResources`.
+  - `electron/core/app-icon.ts` checks `process.resourcesPath` first for packaged builds.
+  - — `electron/afterpack.cjs`, `electron/core/app-icon.ts`, `package.json`
 
-- **Timer far behind real time when window is hidden to tray** — Chromium
-  aggressively throttles `setInterval` in hidden windows, causing the displayed
-  elapsed/remaining time to fall ~3× behind wall-clock time. Two complementary
-  fixes: (1) `backgroundThrottling: false` in `BrowserWindow` webPreferences
-  disables Chromium's background timer throttling entirely; (2) the running-timer
-  effect in the renderer now anchors elapsed/remaining to `Date.now()` instead of
-  counting ticks, so the displayed time is always accurate even if an interval
-  fires late.
-  — `electron/main.ts`; `src/App.tsx` (running timer effect + new refs
-  `runStartTimeRef`, `runTotalSecondsRef`).
+- **Timer far behind real time when window hidden to tray**
+  - `backgroundThrottling: false` in `BrowserWindow` webPreferences.
+  - Running timer in renderer anchors elapsed/remaining to `Date.now()` instead of
+    counting `setInterval` ticks.
+  - — `electron/main.ts`, `src/App.tsx`
 
-- **Ctrl+Tab spinning between only two files** — The tab-cycling action previously
-  sent a single `Ctrl+Tab` press, causing VS Code / Chrome to flip between exactly
-  two files/tabs. It now holds Ctrl and presses Tab **1–5 times** (random), so
-  each action cycles through a variable number of open files or browser tabs before
-  releasing Ctrl. The `BASIC_POOL` weights also increase tab-cycling frequency
-  (4× weight vs. 1× before).
-  — `scripts/lib/actions.py`: `action_ctrl_tab()` → `action_ctrl_tab_multi()`.
+- **Ctrl+Tab spinning between only two files/tabs**
+  - Tab action holds Ctrl and presses Tab **1–5 times** (random) per action.
+  - `action_ctrl_tab()` renamed to `action_ctrl_tab_multi()`.
+  - Tab cycling weighted 4× in `BASIC_POOL`.
+  - — `scripts/lib/actions.py`
 
-- **Advanced mode app switching too frequent** — `action_app_switch` appeared
-  twice in `ADVANCED_POOL` (≈17% of actions). It now appears once (≈7%), making
-  tab/file cycling the dominant activity and application switching occasional.
-  — `scripts/lib/actions.py`.
+- **Advanced mode app switching too frequent**
+  - `action_app_switch` reduced from 2× to 1× in `ADVANCED_POOL` (~7% of actions).
+  - — `scripts/lib/actions.py`
 
-- **macOS: Python rocket icon appearing in Dock** — `pyautogui` imports
-  Quartz/pyobjc, which creates an `NSApplication` instance and shows the Python
-  icon in the Dock. The fix calls `[NSApp setActivationPolicy: NSApplicationActivationPolicyProhibited]`
-  via `ctypes` **before** `import pyautogui`, suppressing the Dock entry.
-  — `scripts/lib/actions.py`.
+- **macOS: Python rocket icon in Dock**
+  - `NSApplicationActivationPolicyProhibited` set via ctypes before `import pyautogui`.
+  - — `scripts/lib/actions.py`
 
----
+### Build
 
-All notable changes to **InternalX** are documented here.
-
-Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
-Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+- Windows installer: `release/InternalX-Setup-1.0.2.exe`
 
 ---
 
@@ -79,34 +96,37 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- **Platform: keyboard shortcuts** — Advanced mode application switching now uses
-  `Cmd+Tab` on macOS instead of `Alt+Tab` (which is `Option+Tab` on macOS and
-  does not switch applications). Windows continues to use `Alt+Tab`.
-  — `scripts/lib/actions.py`: renamed `action_alt_tab()` → `action_app_switch()`
-  with `sys.platform` branching; updated `ADVANCED_POOL` reference.
+- **Platform: keyboard shortcuts**
+  - Advanced mode uses `Cmd+Tab` on macOS and `Alt+Tab` on Windows/Linux.
+  - `action_alt_tab()` renamed to `action_app_switch()` with `sys.platform` branching.
+  - — `scripts/lib/actions.py`
 
-- **Platform: macOS Accessibility warning** — Before spawning the Python automation
-  process on macOS, InternalX now checks `systemPreferences.isTrustedAccessibilityClient()`
-  and writes a clear `WARN` entry to the Activity Log if the permission is missing,
-  explaining exactly where to grant it.
-  — `electron/core/automation.ts`: added `warnIfAccessibilityNotGranted()`.
+- **Platform: macOS Accessibility warning**
+  - Checks `systemPreferences.isTrustedAccessibilityClient()` before spawning Python;
+    logs a clear `WARN` with setup instructions if permission is missing.
+  - — `electron/core/automation.ts`
 
-- **UI tooltips** — Mode selector tooltips no longer mention Windows-only shortcuts.
-  Basic mode: "No application switching (Alt+Tab)" → "No application switching."
-  Advanced mode now reads: "Includes application switching (Alt+Tab on Windows,
-  Cmd+Tab on macOS)."
-  — `src/App.tsx`: updated `MODE_OPTIONS` constants.
+- **UI tooltips**
+  - Mode tooltips no longer use Windows-only shortcut wording.
+  - Advanced mode: "Alt+Tab on Windows, Cmd+Tab on macOS".
+  - — `src/App.tsx`
 
-- **Docs: stale `keyboard` package references** — `docs/development/python-prerequisites.md`
-  incorrectly listed `keyboard` as a required package. Only `pyautogui` is required.
-  Removed stale references from verify-imports examples and the related-files footer.
-  Added a new macOS Accessibility permission setup section.
+- **Docs: stale `keyboard` package references**
+  - `docs/development/python-prerequisites.md` updated — only `pyautogui` is required.
+  - Added macOS Accessibility permission setup section.
 
 ### Changed
 
-- `scripts/advanced_mode.py` — updated docstring to describe "application switching"
-  generically rather than naming `Alt+Tab` specifically.
+- `scripts/advanced_mode.py` — docstring updated for platform-neutral app switching.
 - `scripts/basic_mode.py` — minor docstring clarification.
+
+### Added
+
+- Windows/macOS packaging via **electron-builder** (`dist:win`, `dist:mac` scripts).
+
+### Build
+
+- Windows installer: `release/InternalX-Setup-1.0.1.exe`
 
 ---
 
@@ -116,8 +136,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial release of **InternalX** desktop automation app.
 - Electron 33 shell with React + Tailwind UI.
-- Basic mode: `Ctrl+Tab`, scroll, arrow keys, page up/down.
-- Advanced mode: all Basic actions + application switching.
+- **Basic mode** — `Ctrl+Tab`, scroll, arrow keys, page up/down (no app switching).
+- **Advanced mode** — all Basic actions + application switching.
 - System tray with start/stop/exit context menu.
 - Auto-launch at OS login (production builds).
 - Python prerequisites check and one-click install via pip.
@@ -125,5 +145,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - OS shutdown after automation ends with 30-second cancellable countdown.
 - Persistent activity log with export to file.
 - Voice announcements via Web Speech API.
+
+### Build
+
 - Windows installer: `InternalX-Setup-1.0.0.exe` (NSIS, x64).
 - macOS disk image: `InternalX-1.0.0.dmg` (must be built on macOS).
