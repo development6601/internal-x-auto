@@ -1,21 +1,59 @@
+// ============================================================================
+// IMPORTS
+// ============================================================================
+
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { registerIpcHandlers } from './core/ipc.js'
+import { cleanupOnExit } from './core/automation.js'
+import { createTray, destroyTray } from './core/tray.js'
+import { configureAutoLaunch, shouldStartHidden } from './core/startup.js'
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+const APP_WIDTH = 420
+const APP_MIN_WIDTH = 350
+const APP_MAX_WIDTH = 450
+const APP_HEIGHT = 720
+const APP_MIN_HEIGHT = 700
+const APP_MAX_HEIGHT = 750
+
+// ============================================================================
+// STATE
+// ============================================================================
 
 let mainWindow: BrowserWindow | null = null
 
-function createWindow() {
+/**
+ * Set to true before app.quit() so the window `close` handler allows the
+ * quit to proceed instead of hiding to tray.
+ */
+let isQuitting = false
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+function getMainWindow(): BrowserWindow | null {
+  return mainWindow
+}
+
+function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 420,
-    height: 720,
-    minWidth: 400,
-    maxWidth: 500,
-    minHeight: 480,
-    maxHeight: 800,
+    width: APP_WIDTH,
+    height: APP_HEIGHT,
+    minWidth: APP_MIN_WIDTH,
+    maxWidth: APP_MAX_WIDTH,
+    minHeight: APP_MIN_HEIGHT,
+    maxHeight: APP_MAX_HEIGHT,
     title: 'InternalX',
+    // Start hidden when launched at login (--hidden flag)
+    show: !shouldStartHidden(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -29,22 +67,53 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 
+  // Minimize to tray on close — only fully quit via tray "Exit"
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault()
+      mainWindow?.hide()
+    }
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
   })
 }
 
+// ============================================================================
+// APP LIFECYCLE
+// ============================================================================
+
 app.whenReady().then(() => {
+  // Register all IPC handlers before creating the window
+  registerIpcHandlers(getMainWindow)
+
+  // Create the main window
   createWindow()
 
+  // Create the system tray icon and context menu
+  createTray(getMainWindow)
+
+  // Register the app in the OS startup registry (production only)
+  configureAutoLaunch()
+
   app.on('activate', () => {
+    // macOS: re-create window if dock icon is clicked and no windows are open
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow()
     }
   })
 })
 
+app.on('before-quit', () => {
+  isQuitting = true
+  // Kill any running Python child process before exiting
+  cleanupOnExit()
+  destroyTray()
+})
+
 app.on('window-all-closed', () => {
+  // On macOS apps stay active until explicitly quit; on Windows/Linux quit immediately.
   if (process.platform !== 'darwin') {
     app.quit()
   }
