@@ -169,6 +169,8 @@ const App = () => {
   const [showIndefiniteModal, setShowIndefiniteModal] = useState(false)
   const [showShutdownModal, setShowShutdownModal] = useState(false)
   const [shutdownCountdown, setShutdownCountdown] = useState(30)
+  const [showScreenLockModal, setShowScreenLockModal] = useState(false)
+  const [screenLockCountdown, setScreenLockCountdown] = useState(10)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'main' | 'log'>('main')
   const [showDevLog, setShowDevLog] = useState(false)
@@ -338,14 +340,20 @@ const App = () => {
       setShowShutdownModal(true)
       announceShutdown()
     } else if (screenLock) {
-      // Standalone screen lock — lock immediately
-      window.electronAPI?.postStop?.lockScreen()
+      // Standalone screen lock — show 10-second countdown first
+      setScreenLockCountdown(10)
+      setShowScreenLockModal(true)
     }
   }, [isActive, isRunning, elapsedSeconds, screenLock, shutdownAfterStop, automationStop, announceStopped, announceShutdown])
 
   const handleCancelShutdown = useCallback(() => {
     setShowShutdownModal(false)
     setShutdownCountdown(30)
+  }, [])
+
+  const handleCancelScreenLock = useCallback(() => {
+    setShowScreenLockModal(false)
+    setScreenLockCountdown(10)
   }, [])
 
   const handleExportLog = useCallback(async () => {
@@ -444,8 +452,9 @@ const App = () => {
         setShowShutdownModal(true)
         announceShutdown()
       } else if (screenLock) {
-        // Standalone screen lock — lock immediately
-        window.electronAPI?.postStop?.lockScreen()
+        // Standalone screen lock — show 10-second countdown first
+        setScreenLockCountdown(10)
+        setShowScreenLockModal(true)
       }
     }
   }, [isRunning, hasNoTimer, remainingSeconds, screenLock, shutdownAfterStop, elapsedSeconds, automationStop, announceStopped, announceShutdown])
@@ -472,6 +481,25 @@ const App = () => {
 
     return () => window.clearTimeout(timerId)
   }, [showShutdownModal, shutdownCountdown])
+
+  // ============================================================================
+  // EFFECTS - Screen Lock Countdown
+  // ============================================================================
+  useEffect(() => {
+    if (!showScreenLockModal) return
+
+    if (screenLockCountdown <= 0) {
+      setShowScreenLockModal(false)
+      window.electronAPI?.postStop?.lockScreen()
+      return
+    }
+
+    const timerId = window.setTimeout(() => {
+      setScreenLockCountdown((prev) => prev - 1)
+    }, 1000)
+
+    return () => window.clearTimeout(timerId)
+  }, [showScreenLockModal, screenLockCountdown])
 
   // ============================================================================
   // EFFECTS - Tray IPC subscriptions
@@ -971,6 +999,19 @@ const App = () => {
           confirmLabel="Start Anyway"
           cancelLabel="Go Back"
           onConfirm={handleConfirmIndefinite}
+        />
+
+        {/* Screen Lock Countdown Modal */}
+        <Modal
+          isOpen={showScreenLockModal}
+          onClose={handleCancelScreenLock}
+          eyebrow="Screen Lock"
+          title="Locking Screen"
+          description={`Screen will lock in ${screenLockCountdown} seconds...`}
+          confirmLabel="Cancel"
+          cancelLabel="Dismiss"
+          onConfirm={handleCancelScreenLock}
+          showActions
         />
 
         {/* Shutdown Countdown Modal */}

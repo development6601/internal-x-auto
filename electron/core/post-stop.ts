@@ -2,7 +2,7 @@
 // IMPORTS
 // ============================================================================
 
-import { execSync } from 'child_process'
+import { execSync, spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -391,14 +391,27 @@ const macUpworkOps: UpworkPlatformOps = {
 
 const runPlatformShutdown = (): void => {
   if (process.platform === 'win32') {
-    execSync('shutdown /s /t 0', { stdio: 'ignore' })
+    // Use spawn + detached so the shutdown process runs independently of Electron.
+    // execSync waits for the child and Windows kills the parent mid-execution,
+    // causing a "Command failed" throw before the shutdown can land.
+    // /s = shutdown, /f = force-close apps, /t 0 = no delay.
+    const child = spawn('shutdown', ['/s', '/f', '/t', '0'], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    child.unref()
     return
   }
 
   if (process.platform === 'darwin') {
-    execSync('osascript -e \'tell application "System Events" to shut down\'', {
+    // Same detached pattern for macOS — osascript exits before System Events
+    // actually powers off, which makes execSync throw on some versions.
+    const child = spawn('osascript', ['-e', 'tell application "System Events" to shut down'], {
+      detached: true,
       stdio: 'ignore',
     })
+    child.unref()
     return
   }
 
