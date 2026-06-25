@@ -290,7 +290,6 @@ export function checkPythonPrerequisites(): PrerequisitesCheckResult {
     }
   }
 
-  const scriptsDir = getScriptsDir()
   const requirementsPath = getRequirementsPath()
 
   if (!fs.existsSync(requirementsPath)) {
@@ -341,7 +340,6 @@ export async function installPythonPrerequisites(
     return { success: false, error: message }
   }
 
-  const scriptsDir = getScriptsDir()
   const requirementsPath = getRequirementsPath()
 
   if (!fs.existsSync(requirementsPath)) {
