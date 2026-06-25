@@ -7,7 +7,6 @@ type Unsubscribe = () => void
 interface AutomationStartPayload {
   mode: 'basic' | 'advanced'
   durationSeconds: number
-  closeTracker: boolean
   shutdown: boolean
 }
 
@@ -68,11 +67,16 @@ interface ElectronAPI {
     onNewEntry: (cb: (payload: { entry: string }) => void) => Unsubscribe
   }
   postStop: {
+    lockScreen: () => void
     executeShutdown: () => void
   }
   tray: {
     onRequestStart: (cb: () => void) => Unsubscribe
     onRequestStop: (cb: () => void) => Unsubscribe
+    onRequestStartPreset: (cb: (payload: { hours: number }) => void) => Unsubscribe
+    onSetScreenLock: (cb: (payload: { value: boolean }) => void) => Unsubscribe
+    onSetShutdown: (cb: (payload: { value: boolean }) => void) => Unsubscribe
+    notifyPostStopOptionsChanged: (screenLock: boolean, shutdown: boolean) => void
     notifyModeChanged: (mode: string) => void
   }
 }

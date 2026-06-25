@@ -20,11 +20,11 @@ import { APP_NAME } from '../src/constants/app.constants.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const APP_WIDTH = 420
-const APP_MIN_WIDTH = 350
+const APP_MIN_WIDTH = 380
 const APP_MAX_WIDTH = 450
-const APP_HEIGHT = 720
+const APP_HEIGHT = 750
 const APP_MIN_HEIGHT = 700
-const APP_MAX_HEIGHT = 850
+const APP_MAX_HEIGHT = 800
 const WINDOWS_APP_USER_MODEL_ID = 'com.internalx.app'
 
 // Must be set before app.whenReady() so Windows groups the taskbar entry
@@ -165,6 +165,24 @@ app.setName(APP_NAME)
 
 if (process.platform === 'darwin') {
   app.setAboutPanelOptions({ applicationName: APP_NAME })
+}
+
+// ── Single-instance lock ──────────────────────────────────────────────────────
+// If a second instance is launched, the new process quits immediately and the
+// already-running window is focused/restored instead.
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    // A second launch was attempted — bring the existing window to front
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  })
 }
 
 app.whenReady().then(() => {

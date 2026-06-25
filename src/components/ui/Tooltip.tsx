@@ -28,13 +28,23 @@ export interface TooltipProps {
   placement?: TooltipPlacement
 }
 
+interface PositionResult {
+  style: CSSProperties
+  /** Pixel offset of the arrow div from the tooltip's left edge. */
+  arrowLeft: number
+  /** True when the tooltip is rendered above the trigger (arrow at bottom). */
+  isAbove: boolean
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
 const VIEWPORT_MARGIN = 10
-const TOOLTIP_GAP = 8
+const TOOLTIP_GAP = 10
 const TOOLTIP_Z_INDEX = 9999
+const ARROW_SIZE = 12
+const ARROW_HALF = ARROW_SIZE / 2
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -45,24 +55,30 @@ const computeTooltipPosition = (
   tooltipRect: DOMRect,
   maxWidth: number,
   placement: TooltipPlacement,
-): CSSProperties => {
+): PositionResult => {
   const viewportWidth = window.innerWidth
   const viewportHeight = window.innerHeight
   const tooltipWidth = Math.min(maxWidth, tooltipRect.width || maxWidth)
   const tooltipHeight = tooltipRect.height
 
-  let top =
-    placement === 'top'
-      ? triggerRect.top - tooltipHeight - TOOLTIP_GAP
-      : triggerRect.bottom + TOOLTIP_GAP
+  let isAbove = false
+  let top: number
 
-  if (placement === 'auto') {
+  if (placement === 'top') {
+    top = triggerRect.top - tooltipHeight - TOOLTIP_GAP
+    isAbove = true
+  } else if (placement === 'bottom') {
+    top = triggerRect.bottom + TOOLTIP_GAP
+    isAbove = false
+  } else {
     const fitsBelow =
       triggerRect.bottom + TOOLTIP_GAP + tooltipHeight <= viewportHeight - VIEWPORT_MARGIN
-    const fitsAbove = triggerRect.top - TOOLTIP_GAP - tooltipHeight >= VIEWPORT_MARGIN
+    const fitsAbove =
+      triggerRect.top - TOOLTIP_GAP - tooltipHeight >= VIEWPORT_MARGIN
 
     if (!fitsBelow && fitsAbove) {
       top = triggerRect.top - tooltipHeight - TOOLTIP_GAP
+      isAbove = true
     } else if (!fitsBelow && !fitsAbove) {
       top = Math.max(
         VIEWPORT_MARGIN,
@@ -71,27 +87,36 @@ const computeTooltipPosition = (
           viewportHeight - tooltipHeight - VIEWPORT_MARGIN,
         ),
       )
+      isAbove = false
+    } else {
+      top = triggerRect.bottom + TOOLTIP_GAP
+      isAbove = false
     }
   }
 
-  top = Math.max(
+  top = Math.max(VIEWPORT_MARGIN, Math.min(top, viewportHeight - tooltipHeight - VIEWPORT_MARGIN))
+
+  const rawLeft = triggerRect.left + triggerRect.width / 2 - tooltipWidth / 2
+  const clampedLeft = Math.max(
     VIEWPORT_MARGIN,
-    Math.min(top, viewportHeight - tooltipHeight - VIEWPORT_MARGIN),
+    Math.min(rawLeft, viewportWidth - tooltipWidth - VIEWPORT_MARGIN),
   )
 
-  let left = triggerRect.left + triggerRect.width / 2 - tooltipWidth / 2
-  left = Math.max(
-    VIEWPORT_MARGIN,
-    Math.min(left, viewportWidth - tooltipWidth - VIEWPORT_MARGIN),
-  )
+  const triggerCenter = triggerRect.left + triggerRect.width / 2
+  const rawArrowLeft = triggerCenter - clampedLeft - ARROW_HALF
+  const arrowLeft = Math.max(8, Math.min(rawArrowLeft, tooltipWidth - ARROW_SIZE - 8))
 
   return {
-    position: 'fixed',
-    top,
-    left,
-    width: maxWidth,
-    zIndex: TOOLTIP_Z_INDEX,
-    visibility: 'visible',
+    style: {
+      position: 'fixed',
+      top,
+      left: clampedLeft,
+      width: maxWidth,
+      zIndex: TOOLTIP_Z_INDEX,
+      visibility: 'visible',
+    },
+    arrowLeft,
+    isAbove,
   }
 }
 
@@ -107,13 +132,17 @@ const Tooltip = ({
   placement = 'auto',
 }: TooltipProps) => {
   const [isVisible, setIsVisible] = useState(false)
-  const [tooltipStyle, setTooltipStyle] = useState<CSSProperties>({
-    position: 'fixed',
-    top: -9999,
-    left: -9999,
-    width: maxWidth,
-    zIndex: TOOLTIP_Z_INDEX,
-    visibility: 'hidden',
+  const [pos, setPos] = useState<PositionResult>({
+    style: {
+      position: 'fixed',
+      top: -9999,
+      left: -9999,
+      width: maxWidth,
+      zIndex: TOOLTIP_Z_INDEX,
+      visibility: 'hidden',
+    },
+    arrowLeft: 0,
+    isAbove: false,
   })
 
   const triggerRef = useRef<HTMLSpanElement>(null)
@@ -128,9 +157,7 @@ const Tooltip = ({
     const triggerRect = trigger.getBoundingClientRect()
     const tooltipRect = tooltip.getBoundingClientRect()
 
-    setTooltipStyle(
-      computeTooltipPosition(triggerRect, tooltipRect, maxWidth, placement),
-    )
+    setPos(computeTooltipPosition(triggerRect, tooltipRect, maxWidth, placement))
   }, [maxWidth, placement])
 
   const show = useCallback(() => setIsVisible(true), [])
@@ -178,8 +205,31 @@ const Tooltip = ({
               'font-body text-xs text-editorial-text-secondary leading-relaxed',
               'pointer-events-none whitespace-normal',
             )}
-            style={tooltipStyle}
+            style={pos.style}
           >
+            <span
+              aria-hidden
+              style={{
+                position: 'absolute',
+                left: pos.arrowLeft,
+                width: ARROW_SIZE,
+                height: ARROW_SIZE,
+                background: 'var(--color-bg-surface)',
+                transform: 'rotate(45deg)',
+                zIndex: 1,
+                ...(pos.isAbove
+                  ? {
+                      bottom: -(ARROW_HALF - 1),
+                      borderRight: '1px solid var(--color-border-light)',
+                      borderBottom: '1px solid var(--color-border-light)',
+                    }
+                  : {
+                      top: -(ARROW_HALF - 1),
+                      borderLeft: '1px solid var(--color-border-light)',
+                      borderTop: '1px solid var(--color-border-light)',
+                    }),
+              }}
+            />
             {content}
           </div>,
           document.body,

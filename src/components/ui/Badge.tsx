@@ -20,12 +20,12 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 // ============================================================================
 
 const VARIANT_CLASSES: Record<BadgeVariant, string> = {
-  success: 'bg-editorial-success-bg text-editorial-success',
-  warning: 'bg-editorial-warning-bg text-editorial-warning',
-  error: 'bg-editorial-error-bg text-editorial-error',
-  info: 'bg-editorial-info-bg text-editorial-info',
-  neutral: 'bg-editorial-secondary text-editorial-muted',
-  running: 'bg-editorial-success-bg text-editorial-success',
+  success: 'bg-editorial-success-bg text-editorial-success border border-[rgba(45,106,79,0.20)]',
+  warning: 'bg-editorial-warning-bg text-editorial-warning border border-[rgba(199,124,44,0.20)]',
+  error: 'bg-editorial-error-bg text-editorial-error border border-[rgba(155,35,53,0.20)]',
+  info: 'bg-editorial-info-bg text-editorial-info border border-[rgba(44,74,123,0.20)]',
+  neutral: 'bg-editorial-secondary text-editorial-muted border border-editorial-border',
+  running: 'bg-editorial-success-bg text-editorial-success border border-[rgba(45,106,79,0.20)]',
 }
 
 // ============================================================================

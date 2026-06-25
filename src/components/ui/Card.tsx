@@ -19,7 +19,7 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 
 const PADDING_CLASSES = {
   xs: 'p-1',
-  sm: 'p-4',
+  sm: 'p-5',
   base: 'p-6',
 }
 
@@ -31,7 +31,7 @@ const Card = ({ padding = 'base', className, children, ...props }: CardProps) =>
   return (
     <div
       className={cn(
-        'bg-editorial-surface border border-editorial-border rounded-editorial shadow-card',
+        'bg-editorial-surface border border-editorial-border rounded-editorial shadow-card transition-shadow duration-200',
         PADDING_CLASSES[padding],
         className,
       )}

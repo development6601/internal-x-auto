@@ -83,6 +83,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ── Post-stop actions ──────────────────────────────────────────────────────
   postStop: {
+    /** Tell Main to lock the screen immediately (Windows / macOS). */
+    lockScreen: (): void => {
+      ipcRenderer.send(IPC_CHANNELS.POST_STOP_SCREEN_LOCK)
+    },
     /** Tell Main to shut down the OS after the 30 s countdown elapses (Windows / macOS). */
     executeShutdown: (): void => {
       ipcRenderer.send(IPC_CHANNELS.POST_STOP_SHUTDOWN)
@@ -108,6 +112,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     onRequestStop: (cb: () => void): Unsubscribe => {
       return onVoid(IPC_CHANNELS.TRAY_REQUEST_STOP, cb)
+    },
+    /** Main asks renderer to start with a specific hour preset. */
+    onRequestStartPreset: (cb: (payload: { hours: number }) => void): Unsubscribe => {
+      return on<{ hours: number }>(IPC_CHANNELS.TRAY_REQUEST_START_PRESET, cb)
+    },
+    /** Main asks renderer to set the screen-lock post-stop preference. */
+    onSetScreenLock: (cb: (payload: { value: boolean }) => void): Unsubscribe => {
+      return on<{ value: boolean }>(IPC_CHANNELS.TRAY_SET_SCREEN_LOCK, cb)
+    },
+    /** Main asks renderer to set the shutdown post-stop preference. */
+    onSetShutdown: (cb: (payload: { value: boolean }) => void): Unsubscribe => {
+      return on<{ value: boolean }>(IPC_CHANNELS.TRAY_SET_SHUTDOWN, cb)
+    },
+    /** Renderer notifies Main that post-stop preferences changed (keeps tray checkboxes in sync). */
+    notifyPostStopOptionsChanged: (screenLock: boolean, shutdown: boolean): void => {
+      ipcRenderer.send(IPC_CHANNELS.TRAY_POST_STOP_OPTIONS_CHANGED, { screenLock, shutdown })
     },
     notifyModeChanged: (mode: string): void => {
       ipcRenderer.send(IPC_CHANNELS.APP_MODE_CHANGED, { mode })

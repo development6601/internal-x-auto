@@ -11,7 +11,6 @@ import { useCallback, useEffect } from 'react'
 interface StartPayload {
   mode: 'basic' | 'advanced'
   durationSeconds: number
-  closeTracker: boolean
   shutdown: boolean
 }
 

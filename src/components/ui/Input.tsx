@@ -25,12 +25,12 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         disabled={disabled}
         className={cn(
           'w-full font-body text-sm text-editorial-text-primary',
-          'bg-editorial-surface border-[1.5px] rounded-editorial',
-          'px-3.5 py-2.5 outline-none',
-          'transition-[border-color,box-shadow] duration-200 ease-out',
-          'placeholder:text-editorial-muted',
-          'hover:border-[#c8b8a8]',
-          'focus:border-editorial-primary focus:shadow-input-focus',
+          'bg-editorial-surface border border-editorial-border rounded-editorial',
+          'px-4 py-2.5 outline-none',
+          'transition-[border-color,box-shadow,background-color] duration-200 ease-out',
+          'placeholder:text-editorial-disabled',
+          'hover:border-[#c0a898] hover:bg-[#fffdf9]',
+          'focus:border-editorial-primary focus:shadow-input-focus focus:bg-editorial-surface',
           'focus-visible:outline-none',
           'disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-editorial-secondary',
           hasError && 'border-editorial-error focus:border-editorial-error focus:shadow-none',

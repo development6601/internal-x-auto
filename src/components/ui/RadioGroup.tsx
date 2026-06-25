@@ -57,14 +57,17 @@ const RadioGroup = <T extends string>({
             key={option.value}
             htmlFor={inputId}
             className={cn(
-              'flex flex-1 items-center justify-center px-2 sm:px-3 py-2 rounded-editorial border cursor-pointer min-w-0',
-              'transition-[background-color,border-color] duration-200',
+              'relative flex flex-1 items-center justify-center px-2 sm:px-3 py-2.5 rounded-editorial border cursor-pointer min-w-0 overflow-hidden',
+              'transition-[background-color,border-color,box-shadow] duration-200',
               isSelected
-                ? 'bg-editorial-surface border-editorial-primary shadow-input-focus'
-                : 'bg-editorial-surface border-editorial-border hover:bg-editorial-secondary',
+                ? 'bg-[rgba(123,45,59,0.04)] border-editorial-primary shadow-input-focus'
+                : 'bg-editorial-surface border-editorial-border hover:bg-editorial-secondary hover:border-[#c0a898]',
               disabled && 'opacity-40 cursor-not-allowed pointer-events-none',
             )}
           >
+            {/* {isSelected && (
+              <span className="absolute left-0 inset-y-0 w-[3px] bg-editorial-primary rounded-r-full" aria-hidden />
+            )} */}
             <input
               id={inputId}
               type="radio"
@@ -76,13 +79,18 @@ const RadioGroup = <T extends string>({
               className="sr-only"
             />
             <span className="inline-flex items-center justify-center gap-1.5 min-w-0">
-              <span className="font-body text-xs font-semibold text-editorial-text-primary leading-none truncate">
+              <span
+                className={cn(
+                  'font-body text-xs font-semibold leading-none truncate transition-colors duration-200',
+                  isSelected ? 'text-editorial-primary' : 'text-editorial-text-primary',
+                )}
+              >
                 {option.label}
               </span>
               {option.tooltip && (
                 <Tooltip content={option.tooltip} maxWidth={240}>
                   <span
-                    className="flex items-center justify-center flex-shrink-0 leading-none h-full min-h-[24px]"
+                    className="flex items-center justify-center flex-shrink-0 leading-none h-full min-h-[20px]"
                     onClick={(event) => event.preventDefault()}
                   >
                     <InfoHint />
