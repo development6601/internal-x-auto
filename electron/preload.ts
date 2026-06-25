@@ -5,7 +5,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import { IPC_CHANNELS } from './core/types.js'
-import type { StartPayload, StopPayload, StatusPayload, ErrorPayload, LogEntryPayload } from './core/types.js'
+import type { StartPayload, StopPayload, StatusPayload, ErrorPayload, LogEntryPayload, PrerequisitesCheckResult, PrerequisitesInstallResult } from './core/types.js'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -50,6 +50,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     onError: (cb: (payload: ErrorPayload) => void): Unsubscribe => {
       return on<ErrorPayload>(IPC_CHANNELS.AUTOMATION_ERROR, cb)
+    },
+  },
+
+  // ── Prerequisites ──────────────────────────────────────────────────────────
+  prerequisites: {
+    check: (): Promise<PrerequisitesCheckResult> => {
+      return ipcRenderer.invoke(IPC_CHANNELS.PREREQUISITES_CHECK)
+    },
+    install: (): Promise<PrerequisitesInstallResult> => {
+      return ipcRenderer.invoke(IPC_CHANNELS.PREREQUISITES_INSTALL)
     },
   },
 

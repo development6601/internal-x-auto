@@ -9,6 +9,7 @@ import { startAutomation, stopAutomation, isRunning } from './automation.js'
 import { devLog, getDevLogEntries, setDevLogRenderer } from './dev-logger.js'
 import { writeLog, readLog } from './logger.js'
 import { closeUpworkTracker, executeSystemShutdown } from './post-stop.js'
+import { checkPythonPrerequisites, installPythonPrerequisites } from './python-deps.js'
 import { updateTrayMode, updateTrayStatus } from './tray.js'
 import { IPC_CHANNELS } from './types.js'
 import type { StartPayload, StopPayload, AutomationStatus } from './types.js'
@@ -90,13 +91,20 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
       updateTrayStatus(status === 'running')
     }
 
-    void startAutomation(payload, onStatus, send.logEntry).catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err)
-      devLog('ERROR', `startAutomation() failed: ${message}`)
-      send.error(message)
-      send.status('error')
-      updateTrayStatus(false)
-    })
+    startAutomation(payload, onStatus, send.logEntry)
+  })
+
+  // ── prerequisites:check ───────────────────────────────────────────────────
+  ipcMain.handle(IPC_CHANNELS.PREREQUISITES_CHECK, () => {
+    devLog('INFO', 'IPC: PREREQUISITES_CHECK')
+    return checkPythonPrerequisites()
+  })
+
+  // ── prerequisites:install ─────────────────────────────────────────────────
+  ipcMain.handle(IPC_CHANNELS.PREREQUISITES_INSTALL, async () => {
+    devLog('INFO', 'IPC: PREREQUISITES_INSTALL')
+    const send = buildSender(getWindow)
+    return installPythonPrerequisites(send.logEntry)
   })
 
   // ── automation:stop ───────────────────────────────────────────────────────
