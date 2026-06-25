@@ -69,7 +69,7 @@ Expected dev log lines:
 ```
 [INFO] Scripts dir resolved: <path-to-project>/scripts
 [INFO] Checking Python prerequisites...
-[INFO] Prerequisites check: missing modules — pyautogui, keyboard
+[INFO] Prerequisites check: missing modules — pyautogui
 ```
 
 If packages are already installed:
@@ -111,13 +111,13 @@ python3 -m pip install -r scripts/requirements.txt --user --break-system-package
 **Windows:**
 
 ```powershell
-python -c "import pyautogui, keyboard; print('OK')"
+python -c "import pyautogui; print('OK')"
 ```
 
 **macOS:**
 
 ```bash
-python3 -c "import pyautogui, keyboard; print('OK')"
+python3 -c "import pyautogui; print('OK')"
 ```
 
 ---
@@ -143,6 +143,19 @@ Both files must exist before running a packaged build.
 
 ---
 
+## macOS — Accessibility permission (required)
+
+`pyautogui` uses macOS Accessibility APIs to simulate keyboard and mouse input.
+Without the permission the script will start but **all actions are silently blocked**.
+
+1. Open **System Settings → Privacy & Security → Accessibility**
+2. Click the **+** button and add **InternalX** (or your terminal in dev mode)
+3. Restart the app after granting permission
+
+The app logs a `WARN` entry if the permission is missing when automation starts.
+
+---
+
 ## Common issues
 
 | Symptom | Cause | Fix |
@@ -151,6 +164,7 @@ Both files must exist before running a packaged build.
 | Install hangs with no output | pip stdout pipe deadlock (fixed) | Pull latest, retry install |
 | `externally-managed-environment` (macOS) | Homebrew PEP 668 | App retries with `--break-system-packages`; or install manually |
 | `Python not found in PATH` | Python not installed | Install Python 3.x and ensure it is on PATH |
+| Actions have no effect on macOS | Accessibility permission denied | See macOS Accessibility section above |
 
 ---
 
@@ -158,4 +172,4 @@ Both files must exist before running a packaged build.
 
 - `electron/core/python-deps.ts` — path resolution, check, pip install
 - `electron/vite-copy-resources.ts` — copies scripts into `dist-electron/scripts` on build
-- `scripts/requirements.txt` — `pyautogui`, `keyboard`
+- `scripts/requirements.txt` — `pyautogui`
