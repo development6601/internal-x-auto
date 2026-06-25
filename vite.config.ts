@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
 import path from 'path'
+import { copyAppResourcesPlugin } from './electron/vite-copy-resources'
 
 export default defineConfig({
   plugins: [
@@ -10,6 +11,9 @@ export default defineConfig({
     electron([
       {
         entry: 'electron/main.ts',
+        vite: {
+          plugins: [copyAppResourcesPlugin()],
+        },
       },
       {
         entry: 'electron/preload.ts',
