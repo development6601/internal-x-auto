@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, ScrollText, Terminal, Trash2 } from 'lucide-react'
+import { Copy, Download, ScrollText, Terminal, Trash2 } from 'lucide-react'
 import {
   Alert,
   Badge,
@@ -84,7 +84,7 @@ const CLOSE_UPWORK_TOOLTIP = (
   <>
     Closes the Upwork Desktop App when automation stops.
     <br />
-    Terminates Upwork.exe if the process is still running.
+    Graceful close first, then force kill if needed. Check Dev Log for steps.
   </>
 )
 
@@ -153,6 +153,7 @@ const App = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showActivityLog, setShowActivityLog] = useState(false)
   const [showDevLog, setShowDevLog] = useState(false)
+  const [devLogCopied, setDevLogCopied] = useState(false)
 
   // ============================================================================
   // CUSTOM HOOKS - IPC Bridge
@@ -280,6 +281,14 @@ const App = () => {
   const handleToggleDevLog = useCallback(() => {
     setShowDevLog((prev) => !prev)
   }, [])
+
+  const handleCopyDevLog = useCallback(() => {
+    if (devLogEntries.length === 0) return
+    navigator.clipboard.writeText(devLogEntries.join('\n')).then(() => {
+      setDevLogCopied(true)
+      setTimeout(() => setDevLogCopied(false), 1500)
+    })
+  }, [devLogEntries])
 
   // ============================================================================
   // EFFECTS - Countdown Timer
@@ -640,13 +649,13 @@ const App = () => {
         {/* Countdown Overlay */}
         {isCountdown && countdownSeconds !== null && (
           <div
-            className="absolute bottom-4 right-5 flex flex-row items-center gap-2 pointer-events-none select-none"
+            className="absolute bottom-4 right-5 flex flex-row items-end gap-2 pointer-events-none select-none"
             aria-live="polite"
           >
-            <span className="font-body text-[10px] font-bold uppercase tracking-eyebrow text-editorial-muted opacity-70">
+            <span className="font-body text-[10px] font-bold uppercase tracking-eyebrow text-editorial-muted opacity-70 mb-[5px]">
               Starting in
             </span>
-            <span className="font-body text-[38px] font-bold leading-none text-editorial-primary opacity-80 tabular-nums">
+            <span className="font-body text-[38px] font-bold leading-none text-editorial-primary opacity-80 tabular-nums inline-block w-[4.5rem] text-right">
               {countdownSeconds}s
             </span>
           </div>
@@ -654,56 +663,82 @@ const App = () => {
 
         {/* Developer Log Panel — terminal-style overlay above main content */}
         {showDevLog && (
-          <div className="absolute inset-x-0 bottom-0 top-[57px] z-30 flex flex-col bg-[#0f1117] border-t border-[#2a2a3a]">
+          <div className="absolute inset-x-0 bottom-0 top-[57px] z-30 flex flex-col bg-[#0d1017] border-t border-[#2a2d3a]">
             {/* Panel header */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a2a3a] flex-shrink-0">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a2d3a] bg-[#0a0d14] flex-shrink-0">
               <div className="flex items-center gap-2">
-                <Terminal size={14} className="text-[#56b6c2]" strokeWidth={2} />
+                <Terminal size={13} className="text-[#56b6c2]" strokeWidth={2} />
                 <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-[#56b6c2]">
-                  Developer Log
+                  Dev Log
                 </span>
-                <span className="font-mono text-[10px] text-[#4a4a5a] ml-1">
+                <span className="font-mono text-[10px] text-[#3d4255] ml-1 tabular-nums">
                   {devLogEntries.length} entries
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={clearDevLogEntries}
-                aria-label="Clear developer log"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono text-[#6a6a7a] hover:text-[#e06c75] hover:bg-[#1a1a2a] transition-colors duration-150"
-              >
-                <Trash2 size={11} strokeWidth={2} />
-                Clear
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleCopyDevLog}
+                  aria-label="Copy developer log"
+                  disabled={devLogEntries.length === 0}
+                  className={cn(
+                    'inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono transition-colors duration-150',
+                    devLogCopied
+                      ? 'text-[#98c379] bg-[#1a2a1a]'
+                      : 'text-[#5a6070] hover:text-[#abb2bf] hover:bg-[#1a1d2a] disabled:opacity-30 disabled:cursor-not-allowed',
+                  )}
+                >
+                  <Copy size={11} strokeWidth={2} />
+                  {devLogCopied ? 'Copied!' : 'Copy'}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearDevLogEntries}
+                  aria-label="Clear developer log"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono text-[#5a6070] hover:text-[#e06c75] hover:bg-[#1a1d2a] transition-colors duration-150"
+                >
+                  <Trash2 size={11} strokeWidth={2} />
+                  Clear
+                </button>
+              </div>
             </div>
 
-            {/* Entries — newest at bottom, auto-scroll */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-0">
+            {/* Entries — oldest at top, newest at bottom */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
               {devLogEntries.length === 0 ? (
-                <p className="font-mono text-[11px] text-[#4a4a5a] text-center py-8">
+                <p className="font-mono text-[11px] text-[#3d4255] text-center py-8">
                   No events yet. Start automation to see debug output.
                 </p>
               ) : (
-                <ul className="divide-y divide-[#1a1a2a]">
+                <ul>
                   {devLogEntries.map((entry, idx) => {
-                    const levelMatch = entry.match(/\[(\w+)\]/)
-                    const level = levelMatch ? levelMatch[1] : 'INFO'
+                    const levelMatch = entry.match(/\[(\w+)\](?:\s*\[(\w+)\])?/)
+                    const level = levelMatch ? (levelMatch[2] ?? levelMatch[1]) : 'INFO'
                     const levelColor =
                       level === 'ERROR'  ? 'text-[#e06c75]' :
-                      level === 'WARN'   ? 'text-[#f0c674]' :
+                      level === 'WARN'   ? 'text-[#e5c07b]' :
                       level === 'SCRIPT' ? 'text-[#56b6c2]' :
                       level === 'STDERR' ? 'text-[#d19a66]' :
-                                           'text-[#8892a4]'
+                                           'text-[#61afef]'
+                    const rowBg = idx % 2 === 0 ? '' : 'bg-[#0a0d14]'
+                    // Split: timestamp+level prefix vs message body
+                    const prefixEnd = entry.indexOf(']', entry.indexOf('[', 5)) + 1
+                    const prefix = entry.substring(0, prefixEnd)
+                    const body = entry.substring(prefixEnd + 1)
                     return (
                       <li
                         key={idx}
-                        className="px-3 py-1 font-mono text-[11px] text-[#abb2bf] hover:bg-[#1a1a2a] transition-colors duration-75 leading-relaxed"
+                        className={cn(
+                          'flex gap-2 px-3 py-[5px] font-mono text-[11.5px] leading-snug',
+                          'hover:bg-[#151822] transition-colors duration-75',
+                          rowBg,
+                        )}
                       >
-                        <span className={cn('font-bold mr-1', levelColor)}>
-                          {entry.substring(0, entry.indexOf(']', entry.indexOf('[', 9)) + 1)}
+                        <span className={cn('shrink-0 font-semibold', levelColor)}>
+                          {prefix}
                         </span>
-                        <span className="text-[#abb2bf]">
-                          {entry.substring(entry.indexOf(']', entry.indexOf('[', 9)) + 2)}
+                        <span className="text-[#c8cdd8] break-all">
+                          {body}
                         </span>
                       </li>
                     )
