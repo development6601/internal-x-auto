@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Copy, Download, ScrollText, Terminal, Trash2 } from 'lucide-react'
+import PrerequisiteStatusButton from '@/components/features/PrerequisiteStatusButton'
 import {
   Alert,
   Badge,
@@ -30,6 +31,7 @@ import { formatDuration, parseTimerInput, timerToSeconds } from '@/utils/format'
 import useAutomation from '@/hooks/useAutomation'
 import useActivityLog from '@/hooks/useActivityLog'
 import useDevLog from '@/hooks/useDevLog'
+import usePrerequisites from '@/hooks/usePrerequisites'
 import useVoice from '@/hooks/useVoice'
 
 // ============================================================================
@@ -143,6 +145,9 @@ const App = () => {
   const [showActivityLog, setShowActivityLog] = useState(false)
   const [showDevLog, setShowDevLog] = useState(false)
   const [devLogCopied, setDevLogCopied] = useState(false)
+  const [showPrereqSuccessModal, setShowPrereqSuccessModal] = useState(false)
+  const [showPrereqFailureModal, setShowPrereqFailureModal] = useState(false)
+  const [prereqFailureMessage, setPrereqFailureMessage] = useState<string | null>(null)
 
   // ============================================================================
   // CUSTOM HOOKS - IPC Bridge
@@ -169,6 +174,24 @@ const App = () => {
 
   const { entries: logEntries, exportLog } = useActivityLog()
   const { entries: devLogEntries, clearEntries: clearDevLogEntries } = useDevLog()
+
+  const handlePrereqInstallSuccess = useCallback(() => {
+    setShowPrereqSuccessModal(true)
+  }, [])
+
+  const handlePrereqInstallFailure = useCallback((message: string) => {
+    setPrereqFailureMessage(message)
+    setShowPrereqFailureModal(true)
+  }, [])
+
+  const {
+    status: prereqStatus,
+    isReady: prerequisitesReady,
+    install: installPrerequisites,
+  } = usePrerequisites({
+    onInstallSuccess: handlePrereqInstallSuccess,
+    onInstallFailure: handlePrereqInstallFailure,
+  })
 
   const { announceCountdownStart, announceStarted, announceStopped, announceShutdown } = useVoice()
 
@@ -221,13 +244,18 @@ const App = () => {
   const handleStartClick = useCallback(() => {
     if (isActive) return
 
+    if (!prerequisitesReady) {
+      setErrorMessage('Requirements not met. Click the package icon in the header to install.')
+      return
+    }
+
     if (hasNoTimer) {
       setShowIndefiniteModal(true)
       return
     }
 
     beginCountdown()
-  }, [isActive, hasNoTimer, beginCountdown])
+  }, [isActive, prerequisitesReady, hasNoTimer, beginCountdown])
 
   const handleConfirmIndefinite = useCallback(() => {
     setShowIndefiniteModal(false)
@@ -270,6 +298,19 @@ const App = () => {
   const handleToggleDevLog = useCallback(() => {
     setShowDevLog((prev) => !prev)
   }, [])
+
+  const handleClosePrereqSuccessModal = useCallback(() => {
+    setShowPrereqSuccessModal(false)
+  }, [])
+
+  const handleClosePrereqFailureModal = useCallback(() => {
+    setShowPrereqFailureModal(false)
+    setPrereqFailureMessage(null)
+  }, [])
+
+  const handlePrereqInstallClick = useCallback(() => {
+    void installPrerequisites()
+  }, [installPrerequisites])
 
   const handleCopyDevLog = useCallback(() => {
     if (devLogEntries.length === 0) return
@@ -408,6 +449,12 @@ const App = () => {
 
             <div className="flex items-center gap-2 flex-shrink-0">
               <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+
+              <PrerequisiteStatusButton
+                status={prereqStatus}
+                onInstall={handlePrereqInstallClick}
+                disabled={isActive}
+              />
 
               {/* Activity Log toggle */}
               <Tooltip content={activityLogTooltip} maxWidth={220} placement="bottom">
@@ -761,6 +808,30 @@ const App = () => {
           cancelLabel="Dismiss"
           onConfirm={handleCancelShutdown}
           showActions
+        />
+
+        {/* Prerequisites Success Modal */}
+        <Modal
+          isOpen={showPrereqSuccessModal}
+          onClose={handleClosePrereqSuccessModal}
+          eyebrow="Setup"
+          title="Requirements Installed"
+          description="Python packages are ready. You can start automation now."
+          confirmLabel="Done"
+          cancelLabel="Close"
+          onConfirm={handleClosePrereqSuccessModal}
+        />
+
+        {/* Prerequisites Failure Modal */}
+        <Modal
+          isOpen={showPrereqFailureModal}
+          onClose={handleClosePrereqFailureModal}
+          eyebrow="Setup"
+          title="Installation Failed"
+          description={prereqFailureMessage ?? 'Could not install Python requirements.'}
+          confirmLabel="Close"
+          cancelLabel="Dismiss"
+          onConfirm={handleClosePrereqFailureModal}
         />
       </div>
     </div>
