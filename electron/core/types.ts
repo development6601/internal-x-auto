@@ -42,6 +42,19 @@ export interface ExportLogResult {
   error?: string
 }
 
+export interface PrerequisitesCheckResult {
+  ready: boolean
+  pythonFound: boolean
+  pythonBin?: string
+  missingModules: string[]
+  message?: string
+}
+
+export interface PrerequisitesInstallResult {
+  success: boolean
+  error?: string
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -52,6 +65,8 @@ export const IPC_CHANNELS = {
   AUTOMATION_STOP: 'automation:stop',
   LOG_EXPORT: 'log:export',
   LOG_GET_ENTRIES: 'log:get-entries',    // Renderer asks Main for full log on mount
+  PREREQUISITES_CHECK: 'prerequisites:check',
+  PREREQUISITES_INSTALL: 'prerequisites:install',
   APP_MODE_CHANGED: 'app:mode-changed',
   POST_STOP_SHUTDOWN: 'post-stop:shutdown', // Renderer asks Main to execute OS shutdown
   // Main → Renderer

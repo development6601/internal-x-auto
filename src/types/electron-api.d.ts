@@ -34,12 +34,29 @@ interface ExportLogResult {
   error?: string
 }
 
+interface PrerequisitesCheckResult {
+  ready: boolean
+  pythonFound: boolean
+  pythonBin?: string
+  missingModules: string[]
+  message?: string
+}
+
+interface PrerequisitesInstallResult {
+  success: boolean
+  error?: string
+}
+
 interface ElectronAPI {
   automation: {
     start: (payload: AutomationStartPayload) => void
     stop: (payload: AutomationStopPayload) => void
     onStatus: (cb: (payload: AutomationStatusPayload) => void) => Unsubscribe
     onError: (cb: (payload: AutomationErrorPayload) => void) => Unsubscribe
+  }
+  prerequisites: {
+    check: () => Promise<PrerequisitesCheckResult>
+    install: () => Promise<PrerequisitesInstallResult>
   }
   log: {
     onNewEntry: (cb: (payload: LogEntryPayload) => void) => Unsubscribe
