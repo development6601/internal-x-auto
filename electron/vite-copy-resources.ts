@@ -27,7 +27,7 @@ export function copyAppResourcesPlugin(): Plugin {
       if (existsSync(scriptSrc)) {
         mkdirSync(scriptDest, { recursive: true })
         for (const file of readdirSync(scriptSrc)) {
-          if (file.endsWith('.ps1')) {
+          if (file.endsWith('.ps1') || file.endsWith('.applescript')) {
             cpSync(path.join(scriptSrc, file), path.join(scriptDest, file))
           }
         }
