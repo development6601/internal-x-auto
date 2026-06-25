@@ -51,11 +51,15 @@ export const IPC_CHANNELS = {
   AUTOMATION_START: 'automation:start',
   AUTOMATION_STOP: 'automation:stop',
   LOG_EXPORT: 'log:export',
+  LOG_GET_ENTRIES: 'log:get-entries',    // Renderer asks Main for full log on mount
   APP_MODE_CHANGED: 'app:mode-changed',
+  POST_STOP_SHUTDOWN: 'post-stop:shutdown', // Renderer asks Main to execute OS shutdown
   // Main → Renderer
   AUTOMATION_STATUS: 'automation:status',
   AUTOMATION_ERROR: 'automation:error',
   LOG_NEW_ENTRY: 'log:new-entry',
+  DEV_LOG_GET_ENTRIES: 'dev-log:get-entries', // Renderer asks Main for buffered dev log
+  DEV_LOG_NEW_ENTRY: 'dev-log:new-entry',     // Main pushes live dev log entries
   TRAY_REQUEST_START: 'tray:request-start',
   TRAY_REQUEST_STOP: 'tray:request-stop',
 } as const
