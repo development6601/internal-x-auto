@@ -5,6 +5,7 @@
 import { app, Menu, nativeImage, Tray } from 'electron'
 import type { BrowserWindow, NativeImage } from 'electron'
 import { IPC_CHANNELS } from './types.js'
+import { APP_NAME } from '../../src/constants/app.constants.js'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -145,7 +146,7 @@ function buildContextMenu(getWindow: GetWindow): Menu {
 export function createTray(getWindow: GetWindow): void {
   _getWindow = getWindow
   tray = new Tray(buildTrayIcon(false))
-  tray.setToolTip('InternalX — Stopped')
+  tray.setToolTip(`${APP_NAME} — Stopped`)
   tray.setContextMenu(buildContextMenu(getWindow))
 
   tray.on('double-click', () => {
@@ -162,7 +163,7 @@ export function updateTrayStatus(isRunning: boolean): void {
   if (!tray || !_getWindow) return
   _isRunning = isRunning
   tray.setImage(buildTrayIcon(isRunning))
-  tray.setToolTip(`InternalX — ${isRunning ? 'Running' : 'Stopped'}`)
+  tray.setToolTip(`${APP_NAME} — ${isRunning ? 'Running' : 'Stopped'}`)
   tray.setContextMenu(buildContextMenu(_getWindow))
 }
 

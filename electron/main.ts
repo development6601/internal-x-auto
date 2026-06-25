@@ -10,6 +10,7 @@ import { registerIpcHandlers } from './core/ipc.js'
 import { cleanupOnExit } from './core/automation.js'
 import { createTray, destroyTray } from './core/tray.js'
 import { configureAutoLaunch, shouldStartHidden } from './core/startup.js'
+import { APP_NAME } from '../src/constants/app.constants.js'
 
 // ============================================================================
 // CONSTANTS
@@ -66,7 +67,7 @@ function createWindow(): void {
     maxWidth: APP_MAX_WIDTH,
     minHeight: APP_MIN_HEIGHT,
     maxHeight: APP_MAX_HEIGHT,
-    title: 'InternalX',
+    title: APP_NAME,
     icon: windowIcon,
     // Start hidden when launched at login (--hidden flag)
     show: !shouldStartHidden(),
@@ -106,6 +107,13 @@ function createWindow(): void {
 // ============================================================================
 // APP LIFECYCLE
 // ============================================================================
+
+// macOS dock hover label defaults to "Electron" in dev unless set explicitly.
+app.setName(APP_NAME)
+
+if (process.platform === 'darwin') {
+  app.setAboutPanelOptions({ applicationName: APP_NAME })
+}
 
 if (process.platform === 'win32') {
   app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID)

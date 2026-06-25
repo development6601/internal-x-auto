@@ -73,7 +73,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ── Post-stop actions ──────────────────────────────────────────────────────
   postStop: {
-    /** Tell Main to execute `shutdown /s /t 0` after the 30 s countdown elapses. */
+    /** Tell Main to shut down the OS after the 30 s countdown elapses (Windows / macOS). */
     executeShutdown: (): void => {
       ipcRenderer.send(IPC_CHANNELS.POST_STOP_SHUTDOWN)
     },
