@@ -4,7 +4,7 @@
 
 export const APP_NAME = 'InternalX'
 
-export const APP_VERSION = 'v1.0.12'
+export const APP_VERSION = 'v1.0.13'
 
 export const APP_MAX_WIDTH = 650
 

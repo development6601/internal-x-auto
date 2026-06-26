@@ -7,6 +7,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.0.13] — 2026-06-26
+
+**Author:** Bhargav Tibadiya
+
+### Changed
+
+- **Application menu bar removed**
+  - Removed the default File / Edit / View / Window menu on all platforms.
+  - `Menu.setApplicationMenu(null)` clears the macOS menu bar; the window menu is
+    hidden on Windows and Linux via `autoHideMenuBar` and `setMenu(null)`.
+  - — `electron/main.ts`
+
+- **Background-running notification on macOS**
+  - Closing the window to tray now shows the same style of notification on
+    **macOS** as on Windows, with platform-appropriate tray exit instructions.
+  - — `electron/main.ts`
+
+### Build
+
+- Version bumped to `1.0.13` in `package.json` and `src/constants/app.constants.ts`.
+
+---
+
 ## [1.0.12] — 2026-06-26
 
 **Author:** Bhargav Tibadiya
