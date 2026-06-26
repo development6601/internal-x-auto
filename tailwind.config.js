@@ -2,8 +2,7 @@
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   // 'class' strategy: dark mode is activated by adding the `dark` class to
-  // <html>. This lets the app respect system preference (auto) while also
-  // supporting a manual user override stored in localStorage.
+  // <html>. Users toggle manually between light and dark in the app header.
   darkMode: 'class',
   theme: {
     extend: {
