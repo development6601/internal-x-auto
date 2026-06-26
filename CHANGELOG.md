@@ -8,6 +8,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.8] — 2026-06-26
+
+**Author:** Bhargav Tibadiya
+
 ### Added
 
 - **Sound effects for automation start, stop, and countdown**
@@ -45,6 +48,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.7] — 2026-06-26
+
+**Author:** Bhargav Tibadiya
+
 ### Added
 
 - **Dark / Light mode with system preference support**
@@ -150,6 +156,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.6] — 2026-06-25
+
+**Author:** Bhargav Tibadiya
+
 ### Fixed
 
 - **Post-Stop Options not visible during an active run**
@@ -166,6 +175,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.5] — 2026-06-25
+
+**Author:** Bhargav Tibadiya
+
 ### Fixed
 
 - **macOS crash: `Failed to load image from path '.../icon.ico'`**
@@ -183,6 +195,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.4] — 2026-06-25
+
+**Author:** Bhargav Tibadiya
+
 ### Fixed
 
 - **Windows taskbar still showing Electron icon**
@@ -210,6 +225,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.3] — 2026-06-25
+
+**Author:** Bhargav Tibadiya
+
 ### Fixed
 
 - **App switching limited to 2-app back-and-forth (VS Code ↔ Chrome)**
@@ -228,6 +246,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.2] — 2026-06-25
+
+**Author:** Bhargav Tibadiya
+
 ### Fixed
 
 - **Windows taskbar icon showing Electron (initial fix)**
@@ -265,6 +286,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.1] — 2026-06-25
+
+**Author:** Bhargav Tibadiya
+
 ### Fixed
 
 - **Platform: keyboard shortcuts**
@@ -302,6 +326,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.0] — 2026-06-25
+
+**Author:** Bhargav Tibadiya
+
 ### Added
 
 - Initial release of **InternalX** desktop automation app.
