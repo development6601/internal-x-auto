@@ -7,6 +7,27 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.0.9] — 2026-06-26
+
+**Author:** Bhargav Tibadiya
+
+### Changed
+
+- **Tray icon hover label shows pending time while running**
+  - Replaced `InternalX — Running` / `InternalX — Stopped` with a status-first
+    label: `Running - 2h 15m Pending` when a timer is set,
+    `Running - No limit` when no timer is configured, and `Stopped` when idle.
+  - The renderer syncs `remainingSeconds` to the main process over IPC so the
+    tooltip updates every second while automation is active.
+  - — `electron/core/tray.ts`, `electron/core/ipc.ts`, `electron/preload.ts`,
+    `src/App.tsx`
+
+### Build
+
+- Version bumped to `1.0.9` in `package.json` and `src/constants/app.constants.ts`.
+
+---
+
 ## [1.0.8] — 2026-06-26
 
 **Author:** Bhargav Tibadiya
