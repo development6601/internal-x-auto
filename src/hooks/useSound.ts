@@ -2,10 +2,12 @@
 // CONSTANTS
 // ============================================================================
 
-const SOUND_URLS = {
-  startEnd: '/sound/start-end.mp3',
-  secondBeep: '/sound/second-beep.mp3',
-} as const
+const FALLBACK_SOUND_URLS = {
+  startEnd: `${import.meta.env.BASE_URL}sound/start-end.mp3`,
+  secondBeep: `${import.meta.env.BASE_URL}sound/second-beep.mp3`,
+}
+
+type SoundUrlMap = { startEnd: string; secondBeep: string }
 
 // ============================================================================
 // STATE
@@ -16,6 +18,12 @@ const audioCache = new Map<string, HTMLAudioElement>()
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
+
+const getSoundUrls = (): SoundUrlMap => {
+  const resolved = window.electronAPI?.sound?.urls
+  if (resolved?.startEnd && resolved?.secondBeep) return resolved
+  return FALLBACK_SOUND_URLS
+}
 
 const getAudio = (url: string): HTMLAudioElement => {
   const cached = audioCache.get(url)
@@ -46,15 +54,15 @@ const playSound = (url: string): void => {
 
 /**
  * Plays bundled UI sounds for automation start/stop and countdown ticks.
- * Assets live in `resources/sound/` and are copied to `public/sound/` at build time.
+ * Preload resolves file:// URLs from extraResources in packaged builds.
  */
 const useSound = () => {
   const playStartEnd = (): void => {
-    playSound(SOUND_URLS.startEnd)
+    playSound(getSoundUrls().startEnd)
   }
 
   const playSecondBeep = (): void => {
-    playSound(SOUND_URLS.secondBeep)
+    playSound(getSoundUrls().secondBeep)
   }
 
   return { playStartEnd, playSecondBeep }

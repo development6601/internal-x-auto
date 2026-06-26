@@ -47,6 +47,12 @@ interface PrerequisitesInstallResult {
 }
 
 interface ElectronAPI {
+  sound: {
+    urls: {
+      startEnd: string
+      secondBeep: string
+    }
+  }
   automation: {
     start: (payload: AutomationStartPayload) => void
     stop: (payload: AutomationStopPayload) => void

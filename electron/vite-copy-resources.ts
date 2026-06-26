@@ -79,6 +79,15 @@ function copyAppResources(): void {
   }
 }
 
+export function copySoundFilesPlugin(): Plugin {
+  return {
+    name: 'copy-sound-files',
+    buildStart() {
+      copySoundFiles()
+    },
+  }
+}
+
 export function copyAppResourcesPlugin(): Plugin {
   return {
     name: 'copy-app-resources',

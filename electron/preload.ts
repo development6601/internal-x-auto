@@ -4,6 +4,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
+import { resolveSoundUrls } from './core/sound-paths.js'
 import { IPC_CHANNELS } from './core/types.js'
 import type { StartPayload, StopPayload, StatusPayload, ErrorPayload, LogEntryPayload, PrerequisitesCheckResult, PrerequisitesInstallResult } from './core/types.js'
 
@@ -36,6 +37,12 @@ function onVoid(channel: string, callback: () => void): Unsubscribe {
 // ============================================================================
 
 contextBridge.exposeInMainWorld('electronAPI', {
+
+  // ── Sound ──────────────────────────────────────────────────────────────────
+  sound: {
+    /** Absolute file:// URLs resolved at preload time for packaged + dev builds. */
+    urls: resolveSoundUrls(),
+  },
 
   // ── Automation ─────────────────────────────────────────────────────────────
   automation: {
