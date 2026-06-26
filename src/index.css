@@ -63,6 +63,70 @@
     --ease-out: cubic-bezier(0, 0, 0.2, 1);
   }
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     EDITORIAL — DARK MODE TOKEN OVERRIDES
+     Applied when the `dark` class is present on <html>. All colours flip to
+     a warm-dark editorial palette: aged-parchment-in-low-light aesthetic.
+     ═══════════════════════════════════════════════════════════════════════ */
+  .dark {
+    /* ─── BACKGROUNDS ────────────────────────────────────────────── */
+    --color-bg-base:          #16130f;   /* Deep warm dark — editorial night */
+    --color-bg-surface:       #1e1a15;   /* Cards, panels */
+    --color-bg-elevated:      #1e1a15;
+    --color-bg-secondary:     #2a2520;   /* Hover, inset, secondary surfaces */
+    --color-bg-sunken:        #110e0b;
+    --color-bg-overlay:       rgba(16, 13, 10, 0.92); /* Modal backdrop */
+
+    /* ─── PRIMARY (BURGUNDY) — lightened for dark backgrounds ────── */
+    --color-primary:          #c4677a;   /* Brightened burgundy — readable on dark */
+    --color-primary-hover:    #d47e91;
+    --color-primary-active:   #a84f62;
+    --color-primary-light:    #3d1e26;
+
+    /* ─── TEXT ───────────────────────────────────────────────────── */
+    --color-text-primary:     #f0ebe2;   /* Warm near-white (cream inverted) */
+    --color-text-secondary:   #c8beb4;   /* Warm medium */
+    --color-text-tertiary:    #8c7b6e;   /* Same muted warm */
+    --color-text-muted:       #7a6a60;
+    --color-text-disabled:    #4a3e38;
+    --color-text-inverse:     #16130f;   /* Dark text on burgundy background */
+
+    /* ─── BORDERS ────────────────────────────────────────────────── */
+    --color-border-hairline:  #221e1a;
+    --color-border-light:     #2e2924;
+    --color-border-medium:    #2e2924;
+    --color-border-strong:    #c4677a;
+
+    /* ─── INTERACTIVE ────────────────────────────────────────────── */
+    --color-btn-primary-bg:        #7b2d3b;
+    --color-btn-primary-text:      #f0ebe2;
+    --color-btn-primary-hover:     #9b3d4f;
+    --color-btn-secondary-bg:      transparent;
+    --color-btn-secondary-text:    #c4677a;
+    --color-btn-secondary-border:  #c4677a;
+    --color-btn-secondary-hover:   #2a1a1e;
+    --color-btn-ghost-bg:          transparent;
+    --color-btn-ghost-text:        #7a6a60;
+    --color-btn-ghost-border:      #2e2924;
+    --color-btn-ghost-hover:       #2a2520;
+
+    /* ─── SEMANTIC ───────────────────────────────────────────────── */
+    --color-success:          #4a9e7a;
+    --color-success-bg:       #0d2b1e;
+    --color-warning:          #d4944a;
+    --color-warning-bg:       #2b1e0a;
+    --color-error:            #c4455a;
+    --color-error-bg:         #2b0d12;
+    --color-info:             #4a7ab5;
+    --color-info-bg:          #0d1a2b;
+
+    /* ─── SHADOWS ────────────────────────────────────────────────── */
+    --shadow-card:            0 1px 2px rgba(0, 0, 0, 0.24), 0 4px 18px rgba(0, 0, 0, 0.28);
+    --shadow-modal:           0 8px 40px rgba(0, 0, 0, 0.50), 0 2px 8px rgba(0, 0, 0, 0.28);
+    --shadow-input-focus:     0 0 0 3px rgba(196, 103, 122, 0.20);
+    --shadow-button-primary:  0 2px 10px rgba(123, 45, 59, 0.45), 0 1px 2px rgba(123, 45, 59, 0.28);
+  }
+
   * {
     box-sizing: border-box;
     scrollbar-width: thin;

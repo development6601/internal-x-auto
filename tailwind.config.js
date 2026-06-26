@@ -1,6 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  // 'class' strategy: dark mode is activated by adding the `dark` class to
+  // <html>. This lets the app respect system preference (auto) while also
+  // supporting a manual user override stored in localStorage.
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
