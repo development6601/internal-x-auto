@@ -78,6 +78,7 @@ interface ElectronAPI {
     onSetShutdown: (cb: (payload: { value: boolean }) => void) => Unsubscribe
     notifyPostStopOptionsChanged: (screenLock: boolean, shutdown: boolean) => void
     notifyModeChanged: (mode: string) => void
+    notifyTimerUpdated: (remainingSeconds: number | null, hasNoTimer: boolean) => void
   }
 }
 

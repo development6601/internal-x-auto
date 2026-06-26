@@ -56,6 +56,11 @@ export interface PrerequisitesInstallResult {
   error?: string
 }
 
+export interface TrayTimerPayload {
+  remainingSeconds: number | null
+  hasNoTimer: boolean
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -83,4 +88,5 @@ export const IPC_CHANNELS = {
   TRAY_SET_SCREEN_LOCK: 'tray:set-screen-lock',                    // Main → Renderer: toggle screen lock pref
   TRAY_SET_SHUTDOWN: 'tray:set-shutdown',                          // Main → Renderer: toggle shutdown pref
   TRAY_POST_STOP_OPTIONS_CHANGED: 'tray:post-stop-options-changed', // Renderer → Main: sync pref changes
+  TRAY_TIMER_UPDATED: 'tray:timer-updated',                         // Renderer → Main: sync remaining timer for tooltip
 } as const

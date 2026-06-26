@@ -8,8 +8,6 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { IPC_CHANNELS } from './types.js'
-import { APP_NAME } from '../../src/constants/app.constants.js'
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // ============================================================================
@@ -28,6 +26,8 @@ let _isRunning = false
 let _mode = 'basic'
 let _screenLock = false
 let _shutdown = false
+let _remainingSeconds: number | null = null
+let _hasNoTimer = true
 
 // ============================================================================
 // CONSTANTS — Tray icon PNG filenames
@@ -113,6 +113,31 @@ function buildTrayIcon(isRunning: boolean): NativeImage {
     }
   }
   return nativeImage.createFromBitmap(buf, { width: SIZE, height: SIZE })
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS — Tooltip
+// ============================================================================
+
+/** Format remaining seconds as compact hours/minutes for the tray hover label. */
+function formatPendingDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m`
+  return `${totalSeconds}s`
+}
+
+function buildTrayToolTip(): string {
+  if (!_isRunning) return 'Stopped'
+  if (_hasNoTimer) return 'Running - No limit'
+  if (_remainingSeconds === null) return 'Running'
+  return `Running - ${formatPendingDuration(_remainingSeconds)} Pending`
+}
+
+function refreshTrayToolTip(): void {
+  tray?.setToolTip(buildTrayToolTip())
 }
 
 // ============================================================================
@@ -212,7 +237,7 @@ function buildContextMenu(getWindow: GetWindow): Menu {
 export function createTray(getWindow: GetWindow): void {
   _getWindow = getWindow
   tray = new Tray(buildTrayIcon(false))
-  tray.setToolTip(`${APP_NAME} — Stopped`)
+  tray.setToolTip(buildTrayToolTip())
   tray.setContextMenu(buildContextMenu(getWindow))
 
   tray.on('double-click', () => {
@@ -228,9 +253,24 @@ export function createTray(getWindow: GetWindow): void {
 export function updateTrayStatus(isRunning: boolean): void {
   if (!tray || !_getWindow) return
   _isRunning = isRunning
+  if (!isRunning) {
+    _remainingSeconds = null
+    _hasNoTimer = true
+  }
   tray.setImage(buildTrayIcon(isRunning))
-  tray.setToolTip(`${APP_NAME} — ${isRunning ? 'Running' : 'Stopped'}`)
+  refreshTrayToolTip()
   tray.setContextMenu(buildContextMenu(_getWindow))
+}
+
+/**
+ * Sync remaining timer with the tray hover label while automation is running.
+ * Called from ipc.ts when the renderer sends tray:timer-updated.
+ */
+export function updateTrayTimer(remainingSeconds: number | null, hasNoTimer: boolean): void {
+  if (!tray) return
+  _remainingSeconds = remainingSeconds
+  _hasNoTimer = hasNoTimer
+  if (_isRunning) refreshTrayToolTip()
 }
 
 /**

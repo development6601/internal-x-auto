@@ -132,5 +132,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     notifyModeChanged: (mode: string): void => {
       ipcRenderer.send(IPC_CHANNELS.APP_MODE_CHANGED, { mode })
     },
+    /** Renderer notifies Main of remaining timer for the tray hover label. */
+    notifyTimerUpdated: (remainingSeconds: number | null, hasNoTimer: boolean): void => {
+      ipcRenderer.send(IPC_CHANNELS.TRAY_TIMER_UPDATED, { remainingSeconds, hasNoTimer })
+    },
   },
 })

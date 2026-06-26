@@ -549,6 +549,14 @@ const App = () => {
   }, [screenLock, shutdownAfterStop])
 
   // ============================================================================
+  // EFFECTS - Remaining timer sync to tray tooltip
+  // ============================================================================
+  useEffect(() => {
+    if (!isRunning) return
+    window.electronAPI?.tray?.notifyTimerUpdated(remainingSeconds, hasNoTimer)
+  }, [isRunning, remainingSeconds, hasNoTimer])
+
+  // ============================================================================
   // RENDER - Main Component
   // ============================================================================
   return (

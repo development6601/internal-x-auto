@@ -10,9 +10,9 @@ import { devLog, getDevLogEntries, setDevLogRenderer } from './dev-logger.js'
 import { writeLog, readLog } from './logger.js'
 import { executeScreenLock, executeSystemShutdown } from './post-stop.js'
 import { checkPythonPrerequisites, installPythonPrerequisites } from './python-deps.js'
-import { updateTrayMode, updateTrayPostStopOptions, updateTrayStatus } from './tray.js'
+import { updateTrayMode, updateTrayPostStopOptions, updateTrayStatus, updateTrayTimer } from './tray.js'
 import { IPC_CHANNELS } from './types.js'
-import type { StartPayload, StopPayload, AutomationStatus } from './types.js'
+import type { StartPayload, StopPayload, AutomationStatus, TrayTimerPayload } from './types.js'
 import { formatDuration } from './utils.js'
 
 // ============================================================================
@@ -197,6 +197,15 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     IPC_CHANNELS.TRAY_POST_STOP_OPTIONS_CHANGED,
     (_event, { screenLock, shutdown }: { screenLock: boolean; shutdown: boolean }) => {
       updateTrayPostStopOptions(screenLock, shutdown)
+    },
+  )
+
+  // ── tray:timer-updated ────────────────────────────────────────────────────
+  // Renderer sends remaining timer so the tray hover label shows pending time.
+  ipcMain.on(
+    IPC_CHANNELS.TRAY_TIMER_UPDATED,
+    (_event, { remainingSeconds, hasNoTimer }: TrayTimerPayload) => {
+      updateTrayTimer(remainingSeconds, hasNoTimer)
     },
   )
 }
