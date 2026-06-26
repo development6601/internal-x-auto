@@ -22,9 +22,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const APP_WIDTH = 420
 const APP_MIN_WIDTH = 380
 const APP_MAX_WIDTH = 450
-const APP_HEIGHT = 750
+const APP_HEIGHT =  850
 const APP_MIN_HEIGHT = 700
-const APP_MAX_HEIGHT = 800
+const APP_MAX_HEIGHT = 950
 const WINDOWS_APP_USER_MODEL_ID = 'com.internalx.app'
 
 // Must be set before app.whenReady() so Windows groups the taskbar entry
@@ -168,20 +168,38 @@ if (process.platform === 'darwin') {
 }
 
 // ── Single-instance lock ──────────────────────────────────────────────────────
-// If a second instance is launched, the new process quits immediately and the
-// already-running window is focused/restored instead.
+// Only one InternalX instance may run at a time. If a second instance is
+// launched, that new process exits immediately (app.quit()) and the OS routes a
+// `second-instance` event to the already-running process, which then reveals and
+// focuses the existing window (even if it was hidden to the tray or minimized).
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 
+/** Reveal + focus the existing window, restoring it from tray/minimized state. */
+function focusExistingWindow(): void {
+  if (!mainWindow) {
+    // Window was closed to tray and destroyed — recreate it.
+    createWindow()
+    return
+  }
+
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  if (!mainWindow.isVisible()) mainWindow.show()
+
+  // Briefly force the window above others so it reliably comes to the
+  // foreground on Windows, where focus()/show() alone can be ignored.
+  mainWindow.setAlwaysOnTop(true)
+  mainWindow.show()
+  mainWindow.focus()
+  mainWindow.moveTop()
+  mainWindow.setAlwaysOnTop(false)
+}
+
 if (!gotSingleInstanceLock) {
+  // Another instance already owns the lock — quit without creating a window.
   app.quit()
 } else {
   app.on('second-instance', () => {
-    // A second launch was attempted — bring the existing window to front
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.show()
-      mainWindow.focus()
-    }
+    focusExistingWindow()
   })
 }
 

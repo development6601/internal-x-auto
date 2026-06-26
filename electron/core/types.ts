@@ -16,6 +16,8 @@ export interface StartPayload {
   mode: AutomationMode
   durationSeconds: number
   shutdown: boolean
+  /** Optional: close the Upwork tracker on stop. Defaults to false when omitted. */
+  closeTracker?: boolean
 }
 
 export interface StopPayload {
