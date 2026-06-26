@@ -7,6 +7,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.0.12] — 2026-06-26
+
+**Author:** Bhargav Tibadiya
+
+### Changed
+
+- **Window maximize disabled**
+  - The maximize button is hidden and the window cannot be maximized, keeping the
+    compact automation UI at its intended size.
+  - — `electron/main.ts`
+
+- **Close button hides to tray; Windows background notification**
+  - Clicking the window **X** continues to hide the app to the system tray instead
+    of quitting — automation and timers keep running in the background.
+  - On **Windows only**, a notification is shown:
+    *"Application is running in the background. To exit completely, right-click
+    the tray icon and select Exit."*
+  - The app no longer auto-quits on `window-all-closed` on Windows/Linux; full
+    exit is only via the tray **Exit** menu item.
+  - — `electron/main.ts`
+
+### Build
+
+- Version bumped to `1.0.12` in `package.json` and `src/constants/app.constants.ts`.
+
+---
+
 ## [1.0.11] — 2026-06-26
 
 **Author:** Bhargav Tibadiya
