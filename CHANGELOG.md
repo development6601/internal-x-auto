@@ -7,6 +7,32 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.0.11] — 2026-06-26
+
+**Author:** Bhargav Tibadiya
+
+### Fixed
+
+- **Screen lock skipped when both Screen Lock and Shutdown were enabled**
+  - Combined post-stop flow now runs the **10-second screen lock countdown first**,
+    locks the screen, and only then starts the **30-second shutdown countdown**.
+    Previously shutdown ran both actions at the end of the shutdown timer with only
+    a 1-second gap — on macOS the machine could power off before the lock screen
+    appeared.
+  - Shutdown countdown now triggers shutdown only; lock is never deferred to the
+    final second.
+  - Post-stop handlers use the **locked run snapshot** so the correct options apply
+    even if UI state changes after stop.
+  - macOS and Windows lock commands wait briefly after triggering so the lock UI
+    can present before the next step.
+  - — `src/App.tsx`, `electron/core/post-stop.ts`
+
+### Build
+
+- Version bumped to `1.0.11` in `package.json` and `src/constants/app.constants.ts`.
+
+---
+
 ## [1.0.10] — 2026-06-26
 
 **Author:** Bhargav Tibadiya
