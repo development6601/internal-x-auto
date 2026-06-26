@@ -7,6 +7,30 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.0.10] — 2026-06-26
+
+**Author:** Bhargav Tibadiya
+
+### Fixed
+
+- **Sound effects silent in packaged EXE / DMG builds**
+  - Absolute `/sound/...` paths resolve to the filesystem root under Electron's
+    `file://` page load, so `HTMLAudioElement` could not find the MP3 files in
+    production even though they were bundled via `extraResources`.
+  - Preload now resolves absolute `file://` URLs from `resources/sound/`
+    (packaged) or `public/sound/` (dev) and exposes them on `electronAPI.sound.urls`.
+  - Vite `base` set to `./` so relative fallbacks work with `loadFile`, and a
+    root-level build plugin copies sounds into `public/` before the renderer
+    bundle is emitted.
+  - — `electron/core/sound-paths.ts`, `electron/preload.ts`, `src/hooks/useSound.ts`,
+    `vite.config.ts`, `electron/vite-copy-resources.ts`
+
+### Build
+
+- Version bumped to `1.0.10` in `package.json` and `src/constants/app.constants.ts`.
+
+---
+
 ## [1.0.9] — 2026-06-26
 
 **Author:** Bhargav Tibadiya
