@@ -2,7 +2,7 @@
 // IMPORTS
 // ============================================================================
 
-import { execSync, spawn } from 'child_process'
+import { execFileSync, execSync, spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -448,15 +448,34 @@ export function closeUpworkTracker(onLog: LogCallback): void {
 // UTILITY FUNCTIONS — OS screen lock
 // ============================================================================
 
-const runPlatformScreenLock = (): void => {
+const MAC_CGSESSION_PATH =
+  '/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession'
+
+const runPlatformScreenLock = (onLog: LogCallback): void => {
   if (process.platform === 'win32') {
-    execSync('rundll32.exe user32.dll,LockWorkStation', { stdio: 'ignore' })
+    // Equivalent to pressing Win+L. We use execFileSync (not execSync) so the
+    // command is launched directly without cmd.exe, which on some Windows
+    // locales/configs mis-parses the comma in "user32.dll,LockWorkStation"
+    // and silently fails to lock. The function name is case-sensitive.
+    logStep(onLog, 'Lock: rundll32 user32.dll,LockWorkStation (Win+L equivalent)')
+    execFileSync('rundll32.exe', ['user32.dll,LockWorkStation'], { stdio: 'ignore' })
     return
   }
 
   if (process.platform === 'darwin') {
-    execSync(
-      '"/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession" -suspend',
+    // Primary: CGSession -suspend — the same call macOS uses for "Lock Screen".
+    if (fs.existsSync(MAC_CGSESSION_PATH)) {
+      logStep(onLog, 'Lock: CGSession -suspend')
+      execFileSync(MAC_CGSESSION_PATH, ['-suspend'], { stdio: 'ignore' })
+      return
+    }
+
+    // Fallback: simulate Ctrl+Cmd+Q (the macOS Lock Screen shortcut).
+    // Requires Accessibility permission for the app.
+    logStep(onLog, 'Lock: CGSession missing — falling back to Ctrl+Cmd+Q keystroke', 'WARN')
+    execFileSync(
+      'osascript',
+      ['-e', 'tell application "System Events" to keystroke "q" using {control down, command down}'],
       { stdio: 'ignore' },
     )
     return
@@ -468,8 +487,8 @@ const runPlatformScreenLock = (): void => {
 /**
  * Lock the screen on the host OS.
  *
- * - Windows: `rundll32.exe user32.dll,LockWorkStation`
- * - macOS: CGSession -suspend
+ * - Windows: `rundll32.exe user32.dll,LockWorkStation` (Win+L equivalent)
+ * - macOS: CGSession -suspend, fallback Ctrl+Cmd+Q keystroke
  */
 export function executeScreenLock(onLog: LogCallback): void {
   const platformLabel =
@@ -481,7 +500,7 @@ export function executeScreenLock(onLog: LogCallback): void {
   devLog('INFO', entry)
 
   try {
-    runPlatformScreenLock()
+    runPlatformScreenLock(onLog)
   } catch (err) {
     const errEntry = `ERROR — Screen lock command failed: ${err instanceof Error ? err.message : String(err)}`
     writeLog(errEntry)
