@@ -2,7 +2,7 @@
 // IMPORTS
 // ============================================================================
 
-import { app, BrowserWindow, nativeImage, Notification } from 'electron'
+import { app, BrowserWindow, Menu, nativeImage, Notification } from 'electron'
 import type { NativeImage } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -19,17 +19,19 @@ import { APP_NAME } from '../src/constants/app.constants.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-const APP_WIDTH = 420
-const APP_MIN_WIDTH = 380
-const APP_MAX_WIDTH = 450
+const APP_WIDTH = 425
+const APP_MIN_WIDTH = 425
+const APP_MAX_WIDTH = 425
 const APP_HEIGHT =  850
-const APP_MIN_HEIGHT = 700
-const APP_MAX_HEIGHT = 950
+const APP_MIN_HEIGHT = 850
+const APP_MAX_HEIGHT = 850
 const WINDOWS_APP_USER_MODEL_ID = 'com.internalx.app'
 
-const WINDOWS_BACKGROUND_NOTIFICATION_TITLE = APP_NAME
-const WINDOWS_BACKGROUND_NOTIFICATION_BODY =
+const BACKGROUND_NOTIFICATION_TITLE = APP_NAME
+const BACKGROUND_NOTIFICATION_BODY_WIN =
   'Application is running in the background. To exit completely, right-click the tray icon and select Exit.'
+const BACKGROUND_NOTIFICATION_BODY_MAC =
+  'Application is running in the background. To exit completely, click the menu bar icon and select Exit.'
 
 // Must be set before app.whenReady() so Windows groups the taskbar entry
 // under our AppUserModelID and uses the window icon we provide.
@@ -83,20 +85,31 @@ function setWindowIconSafe(win: BrowserWindow, icon: NativeImage | string): void
   }
 }
 
-/** Windows-only toast when the window is hidden to tray instead of quitting. */
-function showWindowsBackgroundNotification(): void {
-  if (process.platform !== 'win32') return
+/** Toast when the window is hidden to tray instead of quitting. */
+function showBackgroundRunningNotification(): void {
   if (!Notification.isSupported()) return
 
-  const iconPath = getWindowsWindowIcon() ?? getAppIconPath() ?? undefined
+  const iconPath =
+    process.platform === 'win32'
+      ? getWindowsWindowIcon() ?? getAppIconPath() ?? undefined
+      : getAppIconPath() ?? undefined
+
+  const body =
+    process.platform === 'darwin'
+      ? BACKGROUND_NOTIFICATION_BODY_MAC
+      : BACKGROUND_NOTIFICATION_BODY_WIN
 
   const notification = new Notification({
-    title: WINDOWS_BACKGROUND_NOTIFICATION_TITLE,
-    body: WINDOWS_BACKGROUND_NOTIFICATION_BODY,
+    title: BACKGROUND_NOTIFICATION_TITLE,
+    body,
     icon: iconPath,
     silent: true,
   })
   notification.show()
+}
+
+function removeApplicationMenu(): void {
+  Menu.setApplicationMenu(null)
 }
 
 function createWindow(): void {
@@ -118,6 +131,7 @@ function createWindow(): void {
     minHeight: APP_MIN_HEIGHT,
     maxHeight: APP_MAX_HEIGHT,
     maximizable: false,
+    autoHideMenuBar: true,
     title: APP_NAME,
     icon: windowIcon,
     // Start hidden when launched at login (--hidden flag)
@@ -136,6 +150,9 @@ function createWindow(): void {
       backgroundThrottling: false,
     },
   })
+
+  mainWindow.setMenu(null)
+  mainWindow.setMenuBarVisibility(false)
 
   if (process.platform === 'win32' && windowsIconPath) {
     setWindowIconSafe(mainWindow, windowsIconPath)
@@ -169,7 +186,7 @@ function createWindow(): void {
     if (!isQuitting) {
       event.preventDefault()
       mainWindow?.hide()
-      showWindowsBackgroundNotification()
+      showBackgroundRunningNotification()
     }
   })
 
@@ -226,6 +243,7 @@ if (!gotSingleInstanceLock) {
 }
 
 app.whenReady().then(() => {
+  removeApplicationMenu()
   applyAppIcon()
 
   // Register all IPC handlers before creating the window
