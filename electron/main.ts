@@ -2,7 +2,7 @@
 // IMPORTS
 // ============================================================================
 
-import { app, BrowserWindow, nativeImage } from 'electron'
+import { app, BrowserWindow, nativeImage, Notification } from 'electron'
 import type { NativeImage } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -26,6 +26,10 @@ const APP_HEIGHT =  850
 const APP_MIN_HEIGHT = 700
 const APP_MAX_HEIGHT = 950
 const WINDOWS_APP_USER_MODEL_ID = 'com.internalx.app'
+
+const WINDOWS_BACKGROUND_NOTIFICATION_TITLE = APP_NAME
+const WINDOWS_BACKGROUND_NOTIFICATION_BODY =
+  'Application is running in the background. To exit completely, right-click the tray icon and select Exit.'
 
 // Must be set before app.whenReady() so Windows groups the taskbar entry
 // under our AppUserModelID and uses the window icon we provide.
@@ -79,6 +83,22 @@ function setWindowIconSafe(win: BrowserWindow, icon: NativeImage | string): void
   }
 }
 
+/** Windows-only toast when the window is hidden to tray instead of quitting. */
+function showWindowsBackgroundNotification(): void {
+  if (process.platform !== 'win32') return
+  if (!Notification.isSupported()) return
+
+  const iconPath = getWindowsWindowIcon() ?? getAppIconPath() ?? undefined
+
+  const notification = new Notification({
+    title: WINDOWS_BACKGROUND_NOTIFICATION_TITLE,
+    body: WINDOWS_BACKGROUND_NOTIFICATION_BODY,
+    icon: iconPath,
+    silent: true,
+  })
+  notification.show()
+}
+
 function createWindow(): void {
   const appIcon = getAppIcon()
   const appIconPath = getAppIconPath()
@@ -97,6 +117,7 @@ function createWindow(): void {
     maxWidth: APP_MAX_WIDTH,
     minHeight: APP_MIN_HEIGHT,
     maxHeight: APP_MAX_HEIGHT,
+    maximizable: false,
     title: APP_NAME,
     icon: windowIcon,
     // Start hidden when launched at login (--hidden flag)
@@ -148,6 +169,7 @@ function createWindow(): void {
     if (!isQuitting) {
       event.preventDefault()
       mainWindow?.hide()
+      showWindowsBackgroundNotification()
     }
   })
 
@@ -234,8 +256,6 @@ app.on('before-quit', () => {
 })
 
 app.on('window-all-closed', () => {
-  // On macOS apps stay active until explicitly quit; on Windows/Linux quit immediately.
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  // Tray app: keep running in the background on all platforms until the user
+  // chooses Exit from the tray menu. The window is hidden, not destroyed, on X.
 })
