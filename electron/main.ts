@@ -22,9 +22,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const APP_WIDTH = 425
 const APP_MIN_WIDTH = 425
 const APP_MAX_WIDTH = 425
-const APP_HEIGHT =  850
-const APP_MIN_HEIGHT = 850
-const APP_MAX_HEIGHT = 850
+const APP_HEIGHT =  840
+const APP_MIN_HEIGHT = 840
+const APP_MAX_HEIGHT = 840
 const WINDOWS_APP_USER_MODEL_ID = 'com.internalx.app'
 
 const BACKGROUND_NOTIFICATION_TITLE = APP_NAME
