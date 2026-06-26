@@ -7,8 +7,44 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.0.7] — 2026-06-26
+## [1.0.8] — 2026-06-26
+### Added
 
+- **Sound effects for automation start, stop, and countdown**
+  - `start-end.mp3` plays when the 10-second countdown finishes and automation
+    actually starts, and again when automation stops (manual stop or timer expiry).
+  - `second-beep.mp3` plays once per second during the 10-second pre-start
+    countdown (not on button click).
+  - New `useSound` hook (`src/hooks/useSound.ts`) handles playback via the
+    Web Audio API (`HTMLAudioElement`).
+  - Sound assets in `resources/sound/` are copied to `public/sound/` for the
+    renderer and bundled via `extraResources` for packaged builds.
+  - — `src/hooks/useSound.ts`, `src/App.tsx`, `electron/vite-copy-resources.ts`
+
+### Changed
+
+- **Removed Web Speech voice narration**
+  - Dropped spoken announcements ("Automation starting in 10 seconds",
+    "Automation started", "Automation stopped", shutdown warning) via the
+    Web Speech API. Audio feedback is now **sound effects only**
+    (`start-end.mp3` and `second-beep.mp3`).
+  - Removed `src/hooks/useVoice.ts` and all `announce*` calls from `src/App.tsx`.
+
+- **Theme mode simplified to light and dark only**
+  - Removed the `system` option — the app no longer follows OS
+    `prefers-color-scheme`.
+  - Default theme is now **light** (was `system`).
+  - The header toggle switches directly between light ↔ dark.
+  - Legacy `system` values in `localStorage` migrate to light on next load.
+  - — `src/hooks/useTheme.ts`, `src/App.tsx`, `tailwind.config.js`
+
+### Build
+
+- Version bumped to `1.0.8` in `package.json` and `src/constants/app.constants.ts`.
+
+---
+
+## [1.0.7] — 2026-06-26
 ### Added
 
 - **Dark / Light mode with system preference support**
@@ -114,7 +150,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.6] — 2026-06-25
-
 ### Fixed
 
 - **Post-Stop Options not visible during an active run**
@@ -131,7 +166,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.5] — 2026-06-25
-
 ### Fixed
 
 - **macOS crash: `Failed to load image from path '.../icon.ico'`**
@@ -149,7 +183,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.4] — 2026-06-25
-
 ### Fixed
 
 - **Windows taskbar still showing Electron icon**
@@ -177,7 +210,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.3] — 2026-06-25
-
 ### Fixed
 
 - **App switching limited to 2-app back-and-forth (VS Code ↔ Chrome)**
@@ -196,7 +228,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.2] — 2026-06-25
-
 ### Fixed
 
 - **Windows taskbar icon showing Electron (initial fix)**
@@ -234,7 +265,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.1] — 2026-06-25
-
 ### Fixed
 
 - **Platform: keyboard shortcuts**
@@ -272,7 +302,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
 ## [1.0.0] — 2026-06-25
-
 ### Added
 
 - Initial release of **InternalX** desktop automation app.
