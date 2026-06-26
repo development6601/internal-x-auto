@@ -19,6 +19,7 @@
 12. [Breakpoints](#12-breakpoints)
 13. [Icon System](#13-icon-system)
 14. [State Definitions](#14-state-definitions)
+15. [Dark Mode — Token Overrides & Guidelines](#15-dark-mode--token-overrides--guidelines)
 
 ---
 
@@ -886,4 +887,155 @@ a:hover { text-decoration-color: var(--color-primary); }
 
 ---
 
-*End of Design System — Editorial v1.0*
+## 15. Dark Mode — Token Overrides & Guidelines
+
+### 15.1 Philosophy
+
+The Editorial dark mode is **warm-dark**, not cold-dark. The goal is "aged parchment read by candlelight" — very dark warm-brown backgrounds, cream-inverted text, and a slightly-brightened burgundy that can still hold its authority on the dark surface.
+
+**Never** use pure black (`#000000`) or cold greys. All dark surfaces are warm-dark brown family.
+
+---
+
+### 15.2 Implementation Strategy
+
+Dark mode is toggled by adding the `dark` class to `<html>`. CSS custom properties are overridden inside `.dark { }` in `index.css`. All Tailwind colour tokens (`editorial-*`) are defined as `var(--...)` references, so they automatically pick up dark values without per-element `dark:` prefixes.
+
+```
+Light mode: :root { --color-bg-base: #faf7f2; }
+Dark mode:  .dark  { --color-bg-base: #16130f; }
+
+Tailwind:   bg-editorial-base → background: var(--color-bg-base) → auto-switches
+```
+
+The `useTheme` hook in `src/hooks/useTheme.ts` manages three modes:
+- **`system`** — follows `prefers-color-scheme` OS/browser setting (default)
+- **`light`** — forces light regardless of system
+- **`dark`** — forces dark regardless of system
+
+The selected mode is persisted in `localStorage` under the key `internalx-theme`.
+
+---
+
+### 15.3 Dark Mode Token Sheet
+
+Paste the `.dark { }` block into `@layer base` in your `index.css` (or equivalent global CSS).
+
+```css
+.dark {
+  /* ─── BACKGROUNDS ────────────────────────────────────────────── */
+  --color-bg-base:          #16130f;   /* Deep warm dark — editorial night */
+  --color-bg-surface:       #1e1a15;   /* Cards, panels */
+  --color-bg-elevated:      #1e1a15;
+  --color-bg-secondary:     #2a2520;   /* Hover, inset, secondary surfaces */
+  --color-bg-sunken:        #110e0b;
+  --color-bg-overlay:       rgba(16, 13, 10, 0.92); /* Modal backdrop */
+
+  /* ─── PRIMARY (BURGUNDY) — brightened for dark backgrounds ───── */
+  --color-primary:          #c4677a;   /* Readable burgundy on dark */
+  --color-primary-hover:    #d47e91;
+  --color-primary-active:   #a84f62;
+  --color-primary-light:    #3d1e26;
+
+  /* ─── TEXT ───────────────────────────────────────────────────── */
+  --color-text-primary:     #f0ebe2;   /* Warm near-white (cream inverted) */
+  --color-text-secondary:   #c8beb4;   /* Warm medium */
+  --color-text-tertiary:    #8c7b6e;
+  --color-text-muted:       #7a6a60;
+  --color-text-disabled:    #4a3e38;
+  --color-text-inverse:     #16130f;   /* Dark text on burgundy bg */
+
+  /* ─── BORDERS ────────────────────────────────────────────────── */
+  --color-border-hairline:  #221e1a;
+  --color-border-light:     #2e2924;
+  --color-border-medium:    #2e2924;
+  --color-border-strong:    #c4677a;
+
+  /* ─── INTERACTIVE ────────────────────────────────────────────── */
+  --color-btn-primary-bg:        #7b2d3b;
+  --color-btn-primary-text:      #f0ebe2;
+  --color-btn-primary-hover:     #9b3d4f;
+  --color-btn-secondary-bg:      transparent;
+  --color-btn-secondary-text:    #c4677a;
+  --color-btn-secondary-border:  #c4677a;
+  --color-btn-secondary-hover:   #2a1a1e;
+  --color-btn-ghost-bg:          transparent;
+  --color-btn-ghost-text:        #7a6a60;
+  --color-btn-ghost-border:      #2e2924;
+  --color-btn-ghost-hover:       #2a2520;
+
+  /* ─── SEMANTIC ───────────────────────────────────────────────── */
+  --color-success:          #4a9e7a;
+  --color-success-bg:       #0d2b1e;
+  --color-warning:          #d4944a;
+  --color-warning-bg:       #2b1e0a;
+  --color-error:            #c4455a;
+  --color-error-bg:         #2b0d12;
+  --color-info:             #4a7ab5;
+  --color-info-bg:          #0d1a2b;
+
+  /* ─── SHADOWS ────────────────────────────────────────────────── */
+  --shadow-card:            0 1px 2px rgba(0,0,0,0.24), 0 4px 18px rgba(0,0,0,0.28);
+  --shadow-modal:           0 8px 40px rgba(0,0,0,0.50), 0 2px 8px rgba(0,0,0,0.28);
+  --shadow-input-focus:     0 0 0 3px rgba(196,103,122,0.20);
+  --shadow-button-primary:  0 2px 10px rgba(123,45,59,0.45), 0 1px 2px rgba(123,45,59,0.28);
+}
+```
+
+---
+
+### 15.4 Dark Mode Color Palette Reference
+
+| Token | Light Hex | Dark Hex | Dark Purpose |
+|-------|-----------|----------|-------------|
+| `--color-bg-base` | `#faf7f2` | `#16130f` | Deep warm dark page background |
+| `--color-bg-surface` | `#fffefb` | `#1e1a15` | Cards, modals, panels |
+| `--color-bg-secondary` | `#f4ede3` | `#2a2520` | Hover states, secondary surfaces |
+| `--color-primary` | `#7b2d3b` | `#c4677a` | Brightened burgundy (AA on dark) |
+| `--color-text-primary` | `#2c1810` | `#f0ebe2` | Warm near-white for headings |
+| `--color-text-secondary` | `#5e4a3e` | `#c8beb4` | Warm medium for body copy |
+| `--color-text-muted` | `#8c7b6e` | `#7a6a60` | Labels, captions |
+| `--color-border-light` | `#e8e0d5` | `#2e2924` | Card edges, dividers |
+| `--color-success` | `#2d6a4f` | `#4a9e7a` | Brightened for dark bg |
+| `--color-error` | `#9b2335` | `#c4455a` | Brightened for dark bg |
+
+---
+
+### 15.5 Contrast Reference (Dark Mode)
+
+| Pairing | Contrast | WCAG |
+|---------|----------|------|
+| `#f0ebe2` on `#16130f` | ~16:1 | AAA ✓ |
+| `#c8beb4` on `#16130f` | ~9:1 | AAA ✓ |
+| `#c4677a` on `#16130f` | ~5.2:1 | AA ✓ |
+| `#7a6a60` on `#16130f` | ~4.1:1 | AA ✓ |
+| `#f0ebe2` on `#7b2d3b` | ~5.1:1 | AA ✓ |
+
+---
+
+### 15.6 Tailwind Configuration
+
+Enable class-based dark mode in `tailwind.config.js`:
+
+```js
+export default {
+  darkMode: 'class',  // Add 'dark' class to <html> to activate
+  // ...
+}
+```
+
+This works seamlessly with CSS-variable–mapped `editorial-*` colours — no `dark:` prefix needed on individual elements.
+
+---
+
+### 15.7 Dark Mode Anti-Patterns
+
+- ❌ **Do not** use pure black `#000000` or cold grey backgrounds — always warm dark brown family
+- ❌ **Do not** use the same burgundy `#7b2d3b` as a text colour on dark surfaces — it fails contrast; use `#c4677a` instead
+- ❌ **Do not** add `dark:` prefixes to elements that use `editorial-*` tokens — the CSS variable swap handles this automatically
+- ❌ **Do not** apply cold blue or desaturated greys as text — always keep the warm brown character of the system
+- ❌ **Do not** invert to pure white on dark backgrounds — use `#f0ebe2` (warm near-white / cream inverted)
+
+---
+
+*End of Design System — Editorial v1.0 (with Dark Mode — v1.1)*

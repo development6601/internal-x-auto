@@ -1,7 +1,7 @@
 {
   "name": "automation-control",
   "productName": "InternalX",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Automation Control Application",
   "main": "dist-electron/main.js",
   "private": true,
@@ -66,7 +66,11 @@
         "to": "resources",
         "filter": [
           "icon.ico",
-          "icon.png"
+          "icon.png",
+          "tray-running.png",
+          "tray-running@2x.png",
+          "tray-stopped.png",
+          "tray-stopped@2x.png"
         ]
       },
       {

@@ -25,6 +25,7 @@
 18. [Responsive Construction Rules](#18-responsive-construction-rules)
 19. [Accessibility Guidelines](#19-accessibility-guidelines)
 20. [Common Scenarios — Decision Trees](#20-common-scenarios--decision-trees)
+21. [Dark Mode — Construction Rules](#21-dark-mode--construction-rules)
 
 ---
 
@@ -878,6 +879,129 @@ Editorial system? → Same bg as surface, BURGUNDY text + 2px solid #7b2d3b unde
 
 ---
 
-*End of Instructions — Editorial v1.0*
+---
+
+## 21. Dark Mode — Construction Rules
+
+### 21.1 The Dark Mode Principle
+
+Dark mode in the Editorial system is **warm-dark**, never cold-dark. Think of it as reading a premium magazine under warm lamplight, not staring at a monitor in a dark room. The editorial personality — warmth, refinement, literary authority — must be preserved in both modes.
+
+**The single rule: replace cream with warm dark, keep burgundy (brightened).**
+
+---
+
+### 21.2 How It Works
+
+Dark mode is activated by adding the `dark` class to `<html>`. All colours are CSS custom properties, so the `.dark { }` override block in `index.css` automatically re-maps every `editorial-*` Tailwind token. **No `dark:` prefix is needed on individual components.**
+
+```html
+<!-- Light mode (default) -->
+<html>...</html>
+
+<!-- Dark mode (class added by useTheme hook) -->
+<html class="dark">...</html>
+```
+
+The `useTheme()` hook (`src/hooks/useTheme.ts`) manages three modes:
+
+| Mode | Behaviour |
+|------|-----------|
+| `'system'` | Follows OS `prefers-color-scheme` — default |
+| `'light'` | Forces light regardless of system |
+| `'dark'` | Forces dark regardless of system |
+
+Persisted in `localStorage` under key `internalx-theme`.
+
+---
+
+### 21.3 Dark Mode Background Rules
+
+| Surface | Light | Dark | Rule |
+|---------|-------|------|------|
+| Page background | `#faf7f2` | `#16130f` | Warm-dark cream inversion |
+| Cards / panels | `#fffefb` | `#1e1a15` | Slightly lighter than page |
+| Secondary / hover | `#f4ede3` | `#2a2520` | Hover wash, inset areas |
+| Modal backdrop | `rgba(250,247,242,0.90)` | `rgba(16,13,10,0.92)` | Warm dark overlay |
+
+---
+
+### 21.4 Dark Mode Typography Rules
+
+- Primary text: `#f0ebe2` — warm near-white (never pure white)
+- Body copy: `#c8beb4` — warm medium
+- Muted / labels: `#7a6a60` — same family, slightly dimmer
+- Disabled: `#4a3e38`
+
+Cormorant Garamond and Syne remain unchanged — the editorial serif/sans pairing works in both modes.
+
+---
+
+### 21.5 Dark Mode Colour Rules
+
+**Burgundy shifts lighter in dark mode** to maintain contrast:
+
+| Token | Light | Dark |
+|-------|-------|------|
+| `--color-primary` | `#7b2d3b` | `#c4677a` |
+| `--color-primary-hover` | `#5e2330` | `#d47e91` |
+
+Do not use `#7b2d3b` as a text colour on dark backgrounds — it fails contrast. Use `#c4677a` instead.
+
+**Semantic colours shift brighter** (same saturation family, +30% lightness):
+
+| Semantic | Light | Dark |
+|----------|-------|------|
+| Success | `#2d6a4f` | `#4a9e7a` |
+| Warning | `#c77c2c` | `#d4944a` |
+| Error | `#9b2335` | `#c4455a` |
+| Info | `#2c4a7b` | `#4a7ab5` |
+
+---
+
+### 21.6 Implementing the Theme Toggle
+
+Use the `useTheme()` hook and a Sun/Moon icon button:
+
+```tsx
+import useTheme from '@/hooks/useTheme'
+import { Moon, Sun } from 'lucide-react'
+
+const { isDark, cycleTheme, themeMode } = useTheme()
+
+<button onClick={cycleTheme} aria-label={`Appearance: ${themeMode}`}>
+  {isDark ? <Moon size={15} /> : <Sun size={15} />}
+</button>
+```
+
+The hook applies the `dark` class to `document.documentElement` automatically and listens to system preference changes when in `'system'` mode.
+
+---
+
+### 21.7 New Project Dark Mode Checklist
+
+- [ ] `darkMode: 'class'` in `tailwind.config.js`
+- [ ] `.dark { }` token block in `@layer base` in global CSS
+- [ ] `useTheme()` hook wired to a toggle button
+- [ ] All colours use `editorial-*` tokens (never hardcoded hex)
+- [ ] Tab active state uses `bg-editorial-surface` (not `bg-white`)
+- [ ] No cold greys or pure black anywhere in dark surfaces
+
+---
+
+### 21.8 Dark Mode Anti-Patterns
+
+| Anti-Pattern | Correction |
+|-------------|-----------|
+| `bg-black` or `bg-gray-*` for dark surfaces | Use `bg-editorial-base` / CSS vars |
+| `text-white` on dark bg | Use `text-editorial-text-primary` → `#f0ebe2` |
+| `#7b2d3b` as dark-mode text colour | Use `#c4677a` — brightened burgundy |
+| Hardcoding `bg-white` for cards | Use `bg-editorial-surface` |
+| Adding `dark:` prefixes to all elements | Not needed — CSS var swap handles it |
+| Cold blue-grey scrollbars or borders | Keep warm brown family: `#2e2924` etc. |
+
+---
+
+*End of Instructions — Editorial v1.1 (with Dark Mode)*
 *Design System Document: theme-02-editorial-design-system.md*
 *Instructions Document: theme-02-editorial-instructions.md*

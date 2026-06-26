@@ -7,6 +7,112 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.0.7] — 2026-06-26
+
+### Added
+
+- **Dark / Light mode with system preference support**
+  - New `useTheme` hook (`src/hooks/useTheme.ts`) manages three modes:
+    `system` (follows OS preference), `light`, and `dark`.
+  - The chosen mode is persisted in `localStorage` under `internalx-theme`.
+  - The hook applies the `dark` class to `<html>` — Tailwind's `class` dark
+    strategy — so all `editorial-*` CSS-variable tokens automatically swap
+    without per-element `dark:` prefixes.
+  - Dark palette is **warm-dark editorial**: deep warm-brown bases
+    (`#16130f`), cream-inverted text (`#f0ebe2`), brightened burgundy
+    (`#c4677a`). Full token set documented in the design system docs.
+  - Tailwind config updated to `darkMode: 'class'`.
+  - — `tailwind.config.js`, `src/index.css`, `src/hooks/useTheme.ts`
+
+- **Theme toggle button in header (replaces Developer Log)**
+  - A **Sun / Moon toggle** in the top-right header row cycles through
+    `system → light → dark → system` with a tooltip describing the current
+    mode.
+  - Removed the internal-only Developer Log panel and its Terminal button
+    (`showDevLog`, `useDevLog`, associated state and JSX).
+  - — `src/App.tsx`
+
+- **Design system docs: Dark Mode section**
+  - `theme-02-editorial-design-system.md` — Section 15: Dark Mode Token
+    Overrides & Guidelines (CSS token sheet, contrast table, anti-patterns).
+  - `theme-02-editorial-instructions.md` — Section 21: Dark Mode Construction
+    Rules (background, typography, colour, toggle implementation, checklist).
+
+### Changed
+
+- **Start button follows design-system primary colour (burgundy)**
+  - Removed the green override (`!bg-editorial-success`) from the Start
+    button. The button now uses the `primary` variant's burgundy colour,
+    consistent with the Editorial design system.
+  - Stop button upgraded to the `danger` variant (red fill), providing
+    clear visual distinction without hardcoded class overrides.
+  - — `src/App.tsx`
+
+- **Post-Stop Options: Shutdown now depends on Screen Lock**
+  - Both **Screen Lock** and **Shutdown** start **unselected** by default.
+  - **Shutdown is disabled** until **Screen Lock** is enabled. Only after
+    Screen Lock is checked does Shutdown become selectable (a lock must
+    always run before the machine powers off).
+  - Disabling Screen Lock automatically clears Shutdown.
+  - The same dependency is enforced in the **tray menu** — the Shutdown
+    checkbox is greyed out until Screen Lock is checked.
+  - Tooltips updated to describe the new dependency.
+  - — `src/App.tsx`, `electron/core/tray.ts`
+
+- **Tray icon: real app icon composited on status-coloured background**
+  - The tray now uses **raw BGRA bitmap compositing** (not SVG-embedded PNG)
+    to reliably show the InternalX app icon on a status-coloured rounded
+    background: **green** (`#2d6a4f`) when running, **red** (`#9b2335`)
+    when stopped.
+  - Previous SVG + embedded base64-PNG approach failed silently in the
+    Electron main process (which has no full SVG renderer for `<image>`
+    elements), causing the tray to show only a small coloured dot.
+    The new approach uses `nativeImage.toBitmap()` / `createFromBitmap()`
+    directly — reliable on both Windows and macOS.
+  - Falls back to pure SVG power-glyph icons only if bitmap pipeline fails.
+  - — `electron/core/tray.ts`
+
+- **Tab active pill respects dark mode**
+  - Replaced hardcoded `bg-white` on active tab pills with
+    `bg-editorial-surface`, which automatically uses the correct dark/light
+    surface colour via CSS variable.
+  - — `src/App.tsx`
+
+### Fixed
+
+- **Screen lock not working on Windows (only worked on macOS)**
+  - The Windows lock used `execSync('rundll32.exe user32.dll,LockWorkStation')`,
+    which routes through `cmd.exe` and can mis-parse the comma in the DLL
+    entry point on some locales/configs, silently failing to lock.
+  - Now uses `execFileSync('rundll32.exe', ['user32.dll,LockWorkStation'])` —
+    the correct Win+L-equivalent API call launched directly without a shell.
+  - macOS keeps `CGSession -suspend` as the primary lock and now falls back
+    to the **Ctrl+Cmd+Q** keystroke if `CGSession` is unavailable.
+  - Each lock attempt is logged so failures are visible in the activity log.
+  - — `electron/core/post-stop.ts`
+
+- **Multiple app instances could be launched**
+  - The single-instance lock now reliably **reveals and focuses the existing
+    window** when a second launch is attempted — restoring it from the tray
+    or a minimized state, briefly forcing it to the foreground (Windows),
+    and recreating the window if it had been fully closed to tray.
+  - A second process never opens its own window; it exits immediately and
+    hands focus to the already-running instance.
+  - — `electron/main.ts`
+
+- **Production build was broken (`tsc` failure)**
+  - `automation.ts` referenced `payload.closeTracker`, which was missing
+    from the `StartPayload` type, breaking `npm run build`. Added the
+    optional `closeTracker?: boolean` field.
+  - — `electron/core/types.ts`
+
+- **App version was stale in the UI**
+  - `APP_VERSION` was still `v1.0.0` in the footer. Bumped to `v1.0.7` and
+    synced `package.json` to `1.0.7`.
+  - — `src/constants/app.constants.ts`, `package.json`
+
+---
+
 ## [1.0.6] — 2026-06-25
 
 ### Fixed
