@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Bot, Copy, Download, Power, ShieldCheck, ScrollText, SlidersHorizontal, Terminal, Timer, Trash2, Zap } from 'lucide-react'
+import { Bot, Download, Moon, Power, ShieldCheck, ScrollText, SlidersHorizontal, Sun, Timer, Zap } from 'lucide-react'
 import PrerequisiteStatusButton from '@/components/features/PrerequisiteStatusButton'
 import {
   Alert,
@@ -25,8 +25,8 @@ import { cn } from '@/utils/cn'
 import { formatDuration, parseTimerInput, timerToSeconds } from '@/utils/format'
 import useAutomation from '@/hooks/useAutomation'
 import useActivityLog from '@/hooks/useActivityLog'
-import useDevLog from '@/hooks/useDevLog'
 import usePrerequisites from '@/hooks/usePrerequisites'
+import useTheme from '@/hooks/useTheme'
 import useVoice from '@/hooks/useVoice'
 
 // ============================================================================
@@ -72,13 +72,13 @@ const MODE_OPTIONS: ModeOption[] = [
 
 const SCREEN_LOCK_TOOLTIP = (
   <>
-    Locks the screen when automation stops. Automatically enabled when Shutdown is selected.
+    Locks the screen when automation stops. Must be enabled before Shutdown can be selected.
   </>
 )
 
 const SHUTDOWN_TOOLTIP = (
   <>
-    Shuts down the system after automation ends. Shows a 30-second countdown before shutdown. You can cancel anytime.
+    Shuts down the system after automation ends. Requires Screen Lock to be enabled first. Shows a 30-second countdown before shutdown. You can cancel anytime.
   </>
 )
 
@@ -173,8 +173,6 @@ const App = () => {
   const [screenLockCountdown, setScreenLockCountdown] = useState(10)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'main' | 'log'>('main')
-  const [showDevLog, setShowDevLog] = useState(false)
-  const [devLogCopied, setDevLogCopied] = useState(false)
   const [showPrereqSuccessModal, setShowPrereqSuccessModal] = useState(false)
   const [showPrereqFailureModal, setShowPrereqFailureModal] = useState(false)
   const [prereqFailureMessage, setPrereqFailureMessage] = useState<string | null>(null)
@@ -203,7 +201,7 @@ const App = () => {
   })
 
   const { entries: logEntries, exportLog } = useActivityLog()
-  const { entries: devLogEntries, clearEntries: clearDevLogEntries } = useDevLog()
+  const { isDark, cycleTheme, themeMode } = useTheme()
 
   const handlePrereqInstallSuccess = useCallback(() => {
     setShowPrereqSuccessModal(true)
@@ -360,10 +358,6 @@ const App = () => {
     await exportLog()
   }, [exportLog])
 
-  const handleToggleDevLog = useCallback(() => {
-    setShowDevLog((prev) => !prev)
-  }, [])
-
   const handleClosePrereqSuccessModal = useCallback(() => {
     setShowPrereqSuccessModal(false)
   }, [])
@@ -376,14 +370,6 @@ const App = () => {
   const handlePrereqInstallClick = useCallback(() => {
     void installPrerequisites()
   }, [installPrerequisites])
-
-  const handleCopyDevLog = useCallback(() => {
-    if (devLogEntries.length === 0) return
-    navigator.clipboard.writeText(devLogEntries.join('\n')).then(() => {
-      setDevLogCopied(true)
-      setTimeout(() => setDevLogCopied(false), 1500)
-    })
-  }, [devLogEntries])
 
   // ============================================================================
   // EFFECTS - Countdown Timer
@@ -532,8 +518,9 @@ const App = () => {
       if (!value) setShutdownAfterStop(false)
     })
     const unsubShutdown = window.electronAPI.tray.onSetShutdown(({ value }) => {
+      // Shutdown depends on Screen Lock — the tray only allows toggling it when
+      // Screen Lock is already enabled, so we just mirror the value here.
       setShutdownAfterStop(value)
-      if (value) setScreenLock(true)
     })
 
     return () => {
@@ -587,7 +574,7 @@ const App = () => {
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1 rounded-full font-body text-[11px] font-bold tracking-widest transition-all duration-200 select-none',
                     activeTab === 'main'
-                      ? 'bg-white text-editorial-text-primary'
+                      ? 'bg-editorial-surface text-editorial-text-primary'
                       : 'text-editorial-muted hover:text-editorial-text-secondary',
                   )}
                   style={activeTab === 'main' ? { boxShadow: '0 1px 4px rgba(44,24,16,0.10)' } : undefined}
@@ -601,7 +588,7 @@ const App = () => {
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1 rounded-full font-body text-[11px] font-bold tracking-widest transition-all duration-200 select-none',
                     activeTab === 'log'
-                      ? 'bg-white text-editorial-text-primary'
+                      ? 'bg-editorial-surface text-editorial-text-primary'
                       : 'text-editorial-muted hover:text-editorial-text-secondary',
                   )}
                   style={activeTab === 'log' ? { boxShadow: '0 1px 4px rgba(44,24,16,0.10)' } : undefined}
@@ -621,23 +608,30 @@ const App = () => {
                 disabled={isActive}
               />
 
-              {/* Developer log toggle */}
-              <Tooltip content="Developer log — internal debug events" maxWidth={220} placement="bottom">
+              {/* Theme toggle — cycles: system → light → dark → system */}
+              <Tooltip
+                content={
+                  themeMode === 'system'
+                    ? 'Appearance: System default — click to switch to Light'
+                    : themeMode === 'light'
+                      ? 'Appearance: Light mode — click to switch to Dark'
+                      : 'Appearance: Dark mode — click to follow System'
+                }
+                maxWidth={220}
+                placement="bottom"
+              >
                 <button
                   type="button"
-                  onClick={handleToggleDevLog}
-                  aria-label={showDevLog ? 'Hide developer log' : 'Show developer log'}
-                  aria-pressed={showDevLog}
+                  onClick={cycleTheme}
+                  aria-label={`Appearance: ${themeMode} mode`}
                   className={cn(
                     'inline-flex items-center justify-center w-8 h-8 rounded-editorial border-[1.5px]',
                     'transition-colors duration-150',
                     'focus-visible:outline focus-visible:outline-2 focus-visible:outline-editorial-primary focus-visible:outline-offset-2',
-                    showDevLog
-                      ? 'border-[#56b6c2] bg-[#0f1117] text-[#56b6c2]'
-                      : 'border-editorial-border text-editorial-muted hover:bg-editorial-secondary hover:text-editorial-text-primary',
+                    'border-editorial-border text-editorial-muted hover:bg-editorial-secondary hover:text-editorial-text-primary',
                   )}
                 >
-                  <Terminal size={16} strokeWidth={2} />
+                  {isDark ? <Moon size={15} strokeWidth={2} /> : <Sun size={15} strokeWidth={2} />}
                 </button>
               </Tooltip>
             </div>
@@ -750,12 +744,10 @@ const App = () => {
                     label="Shutdown"
                     tooltip={SHUTDOWN_TOOLTIP}
                     checked={displayShutdownAfterStop}
-                    disabled={timerDisabled}
+                    disabled={timerDisabled || !displayScreenLock}
                     onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                      const checked = event.target.checked
-                      setShutdownAfterStop(checked)
-                      // Auto-enable Screen Lock when Shutdown is selected — lock must run first
-                      if (checked) setScreenLock(true)
+                      // Shutdown is only selectable once Screen Lock is enabled
+                      setShutdownAfterStop(event.target.checked)
                     }}
                     readOnly={isActive}
                   />
@@ -781,17 +773,17 @@ const App = () => {
                     variant="primary"
                     size="sm"
                     fullWidth
-                    className="w-full !bg-editorial-success !border-editorial-success text-editorial-success-bg"
+                    className="w-full"
                     onClick={handleStartClick}
                     disabled={isActive}
                   >
                     Start
                   </Button>
                   <Button
-                    variant="secondary"
+                    variant="danger"
                     size="sm"
                     fullWidth
-                    className="w-full !text-editorial-error !border-editorial-error"
+                    className="w-full"
                     onClick={handleStopClick}
                     disabled={!isActive}
                   >
@@ -889,7 +881,7 @@ const App = () => {
         {/* Countdown Overlay */}
         {isCountdown && countdownSeconds !== null && (
           <div
-            className="absolute bottom-4 right-5 flex flex-row items-end gap-2 pointer-events-none select-none"
+            className="absolute bottom-10 right-5 flex flex-row items-end gap-2 pointer-events-none select-none"
             aria-live="polite"
           >
             <span className="font-body text-[10px] font-bold uppercase tracking-eyebrow text-editorial-muted opacity-70 mb-[5px]">
@@ -898,94 +890,6 @@ const App = () => {
             <span className="font-body text-[38px] font-bold leading-none text-editorial-primary opacity-80 tabular-nums inline-block w-[4.5rem] text-right">
               {countdownSeconds}s
             </span>
-          </div>
-        )}
-
-        {/* Developer Log Panel — terminal-style overlay above main content */}
-        {showDevLog && (
-          <div className="absolute inset-x-0 bottom-0 top-[57px] z-30 flex flex-col bg-[#0d1017] border-t border-[#2a2d3a]">
-            {/* Panel header */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a2d3a] bg-[#0a0d14] flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <Terminal size={13} className="text-[#56b6c2]" strokeWidth={2} />
-                <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-[#56b6c2]">
-                  Dev Log
-                </span>
-                <span className="font-mono text-[10px] text-[#3d4255] ml-1 tabular-nums">
-                  {devLogEntries.length} entries
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={handleCopyDevLog}
-                  aria-label="Copy developer log"
-                  disabled={devLogEntries.length === 0}
-                  className={cn(
-                    'inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono transition-colors duration-150',
-                    devLogCopied
-                      ? 'text-[#98c379] bg-[#1a2a1a]'
-                      : 'text-[#5a6070] hover:text-[#abb2bf] hover:bg-[#1a1d2a] disabled:opacity-30 disabled:cursor-not-allowed',
-                  )}
-                >
-                  <Copy size={11} strokeWidth={2} />
-                  {devLogCopied ? 'Copied!' : 'Copy'}
-                </button>
-                <button
-                  type="button"
-                  onClick={clearDevLogEntries}
-                  aria-label="Clear developer log"
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono text-[#5a6070] hover:text-[#e06c75] hover:bg-[#1a1d2a] transition-colors duration-150"
-                >
-                  <Trash2 size={11} strokeWidth={2} />
-                  Clear
-                </button>
-              </div>
-            </div>
-
-            {/* Entries — oldest at top, newest at bottom */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              {devLogEntries.length === 0 ? (
-                <p className="font-mono text-[11px] text-[#3d4255] text-center py-8">
-                  No events yet. Start automation to see debug output.
-                </p>
-              ) : (
-                <ul>
-                  {devLogEntries.map((entry, idx) => {
-                    const levelMatch = entry.match(/\[(\w+)\](?:\s*\[(\w+)\])?/)
-                    const level = levelMatch ? (levelMatch[2] ?? levelMatch[1]) : 'INFO'
-                    const levelColor =
-                      level === 'ERROR' ? 'text-[#e06c75]' :
-                        level === 'WARN' ? 'text-[#e5c07b]' :
-                          level === 'SCRIPT' ? 'text-[#56b6c2]' :
-                            level === 'STDERR' ? 'text-[#d19a66]' :
-                              'text-[#61afef]'
-                    const rowBg = idx % 2 === 0 ? '' : 'bg-[#0a0d14]'
-                    // Split: timestamp+level prefix vs message body
-                    const prefixEnd = entry.indexOf(']', entry.indexOf('[', 5)) + 1
-                    const prefix = entry.substring(0, prefixEnd)
-                    const body = entry.substring(prefixEnd + 1)
-                    return (
-                      <li
-                        key={idx}
-                        className={cn(
-                          'flex gap-2 px-3 py-[5px] font-mono text-[11.5px] leading-snug',
-                          'hover:bg-[#151822] transition-colors duration-75',
-                          rowBg,
-                        )}
-                      >
-                        <span className={cn('shrink-0 font-semibold', levelColor)}>
-                          {prefix}
-                        </span>
-                        <span className="text-[#c8cdd8] break-all">
-                          {body}
-                        </span>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
           </div>
         )}
 
