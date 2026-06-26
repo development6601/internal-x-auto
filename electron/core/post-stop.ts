@@ -451,6 +451,10 @@ export function closeUpworkTracker(onLog: LogCallback): void {
 const MAC_CGSESSION_PATH =
   '/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession'
 
+/** Time to wait after lock so the lock screen is visible before any follow-up action. */
+const MAC_LOCK_SETTLE_MS = 2000
+const WINDOWS_LOCK_SETTLE_MS = 750
+
 const runPlatformScreenLock = (onLog: LogCallback): void => {
   if (process.platform === 'win32') {
     // Equivalent to pressing Win+L. We use execFileSync (not execSync) so the
@@ -459,6 +463,7 @@ const runPlatformScreenLock = (onLog: LogCallback): void => {
     // and silently fails to lock. The function name is case-sensitive.
     logStep(onLog, 'Lock: rundll32 user32.dll,LockWorkStation (Win+L equivalent)')
     execFileSync('rundll32.exe', ['user32.dll,LockWorkStation'], { stdio: 'ignore' })
+    sleepWindows(WINDOWS_LOCK_SETTLE_MS)
     return
   }
 
@@ -467,6 +472,7 @@ const runPlatformScreenLock = (onLog: LogCallback): void => {
     if (fs.existsSync(MAC_CGSESSION_PATH)) {
       logStep(onLog, 'Lock: CGSession -suspend')
       execFileSync(MAC_CGSESSION_PATH, ['-suspend'], { stdio: 'ignore' })
+      sleepMac(MAC_LOCK_SETTLE_MS)
       return
     }
 
@@ -478,6 +484,7 @@ const runPlatformScreenLock = (onLog: LogCallback): void => {
       ['-e', 'tell application "System Events" to keystroke "q" using {control down, command down}'],
       { stdio: 'ignore' },
     )
+    sleepMac(MAC_LOCK_SETTLE_MS)
     return
   }
 

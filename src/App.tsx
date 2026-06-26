@@ -39,6 +39,11 @@ interface ModeOption {
   tooltip: React.ReactNode
 }
 
+interface PostStopSnapshot {
+  screenLock: boolean
+  shutdown: boolean
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -78,7 +83,7 @@ const SCREEN_LOCK_TOOLTIP = (
 
 const SHUTDOWN_TOOLTIP = (
   <>
-    Shuts down the system after automation ends. Requires Screen Lock to be enabled first. Shows a 30-second countdown before shutdown. You can cancel anytime.
+    Shuts down the system after automation ends. Requires Screen Lock to be enabled first. Locks the screen first, then shows a 30-second shutdown countdown. You can cancel anytime.
   </>
 )
 
@@ -171,6 +176,8 @@ const App = () => {
   const [shutdownCountdown, setShutdownCountdown] = useState(30)
   const [showScreenLockModal, setShowScreenLockModal] = useState(false)
   const [screenLockCountdown, setScreenLockCountdown] = useState(10)
+  /** When true, screen lock countdown is followed by the shutdown countdown. */
+  const [pendingShutdownAfterLock, setPendingShutdownAfterLock] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'main' | 'log'>('main')
   const [showPrereqSuccessModal, setShowPrereqSuccessModal] = useState(false)
@@ -257,9 +264,35 @@ const App = () => {
     return { label: 'Ready', color: 'bg-editorial-success' }
   }, [status])
 
+  const screenLockModalDescription = useMemo(() => {
+    if (pendingShutdownAfterLock) {
+      return `Screen will lock in ${screenLockCountdown} seconds, then a 30-second shutdown countdown will begin...`
+    }
+    return `Screen will lock in ${screenLockCountdown} seconds...`
+  }, [pendingShutdownAfterLock, screenLockCountdown])
+
   // ============================================================================
   // FUNCTIONS - Event Handlers
   // ============================================================================
+  const beginPostStopSequence = useCallback((options: PostStopSnapshot) => {
+    if (options.shutdown) {
+      // Lock first, then shutdown — screen lock countdown always runs before shutdown.
+      setPendingShutdownAfterLock(true)
+      setScreenLockCountdown(10)
+      setShowScreenLockModal(true)
+      return
+    }
+
+    if (options.screenLock) {
+      setPendingShutdownAfterLock(false)
+      setScreenLockCountdown(10)
+      setShowScreenLockModal(true)
+    }
+  }, [])
+
+  const resolvePostStopOptions = useCallback((): PostStopSnapshot => {
+    return lockedPostStopOptions ?? { screenLock, shutdown: shutdownAfterStop }
+  }, [lockedPostStopOptions, screenLock, shutdownAfterStop])
   const beginCountdown = useCallback((overrideDurationSeconds?: number) => {
     const durationSecs = overrideDurationSeconds ?? totalTimerSeconds
 
@@ -329,18 +362,11 @@ const App = () => {
     setStatus('stopped')
     setCountdownSeconds(null)
     setRemainingSeconds(null)
-    setLockedPostStopOptions(null)
 
-    if (shutdownAfterStop) {
-      // Shutdown always runs with screen lock — show countdown modal first
-      setShutdownCountdown(30)
-      setShowShutdownModal(true)
-    } else if (screenLock) {
-      // Standalone screen lock — show 10-second countdown first
-      setScreenLockCountdown(10)
-      setShowScreenLockModal(true)
-    }
-  }, [isActive, isRunning, elapsedSeconds, screenLock, shutdownAfterStop, automationStop, playStartEnd])
+    const postStopOptions = resolvePostStopOptions()
+    setLockedPostStopOptions(null)
+    beginPostStopSequence(postStopOptions)
+  }, [isActive, isRunning, elapsedSeconds, resolvePostStopOptions, beginPostStopSequence, automationStop, playStartEnd])
 
   const handleCancelShutdown = useCallback(() => {
     setShowShutdownModal(false)
@@ -350,6 +376,7 @@ const App = () => {
   const handleCancelScreenLock = useCallback(() => {
     setShowScreenLockModal(false)
     setScreenLockCountdown(10)
+    setPendingShutdownAfterLock(false)
   }, [])
 
   const handleExportLog = useCallback(async () => {
@@ -434,18 +461,11 @@ const App = () => {
       playStartEnd()
       setStatus('stopped')
       setCountdownSeconds(null)
+      const postStopOptions = resolvePostStopOptions()
       setLockedPostStopOptions(null)
-      if (shutdownAfterStop) {
-        // Shutdown always runs with screen lock — show countdown modal first
-        setShutdownCountdown(30)
-        setShowShutdownModal(true)
-      } else if (screenLock) {
-        // Standalone screen lock — show 10-second countdown first
-        setScreenLockCountdown(10)
-        setShowScreenLockModal(true)
-      }
+      beginPostStopSequence(postStopOptions)
     }
-  }, [isRunning, hasNoTimer, remainingSeconds, screenLock, shutdownAfterStop, elapsedSeconds, automationStop, playStartEnd])
+  }, [isRunning, hasNoTimer, remainingSeconds, resolvePostStopOptions, beginPostStopSequence, elapsedSeconds, automationStop, playStartEnd])
 
   // ============================================================================
   // EFFECTS - Shutdown Countdown
@@ -455,11 +475,7 @@ const App = () => {
 
     if (shutdownCountdown <= 0) {
       setShowShutdownModal(false)
-      // Lock the screen first, then shut down after 1 second
-      window.electronAPI?.postStop?.lockScreen()
-      window.setTimeout(() => {
-        window.electronAPI?.postStop?.executeShutdown()
-      }, 1000)
+      window.electronAPI?.postStop?.executeShutdown()
       return
     }
 
@@ -479,6 +495,12 @@ const App = () => {
     if (screenLockCountdown <= 0) {
       setShowScreenLockModal(false)
       window.electronAPI?.postStop?.lockScreen()
+
+      if (pendingShutdownAfterLock) {
+        setPendingShutdownAfterLock(false)
+        setShutdownCountdown(30)
+        setShowShutdownModal(true)
+      }
       return
     }
 
@@ -487,7 +509,7 @@ const App = () => {
     }, 1000)
 
     return () => window.clearTimeout(timerId)
-  }, [showScreenLockModal, screenLockCountdown])
+  }, [showScreenLockModal, screenLockCountdown, pendingShutdownAfterLock])
 
   // ============================================================================
   // EFFECTS - Tray IPC subscriptions
@@ -919,7 +941,7 @@ const App = () => {
           onClose={handleCancelScreenLock}
           eyebrow="Screen Lock"
           title="Locking Screen"
-          description={`Screen will lock in ${screenLockCountdown} seconds...`}
+          description={screenLockModalDescription}
           confirmLabel="Cancel"
           cancelLabel="Dismiss"
           onConfirm={handleCancelScreenLock}
