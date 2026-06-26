@@ -16,6 +16,7 @@ import {
   Modal,
   RadioGroup,
   SectionLabel,
+  Switch,
   Tooltip,
   WarningHint,
 } from '@/components/ui'
@@ -183,6 +184,8 @@ const App = () => {
   const [showPrereqSuccessModal, setShowPrereqSuccessModal] = useState(false)
   const [showPrereqFailureModal, setShowPrereqFailureModal] = useState(false)
   const [prereqFailureMessage, setPrereqFailureMessage] = useState<string | null>(null)
+  const [isStopTimerOpen, setIsStopTimerOpen] = useState(false)
+  const [isAfterTimerEndsOpen, setIsAfterTimerEndsOpen] = useState(false)
 
   // ============================================================================
   // CUSTOM HOOKS - IPC Bridge
@@ -396,6 +399,14 @@ const App = () => {
     void installPrerequisites()
   }, [installPrerequisites])
 
+  const handleStopTimerAccordionToggle = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setIsStopTimerOpen(event.target.checked)
+  }, [])
+
+  const handleAfterTimerEndsAccordionToggle = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setIsAfterTimerEndsOpen(event.target.checked)
+  }, [])
+
   // ============================================================================
   // EFFECTS - Countdown Timer
   // ============================================================================
@@ -571,6 +582,15 @@ const App = () => {
   }, [screenLock, shutdownAfterStop])
 
   // ============================================================================
+  // EFFECTS - After Timer Ends accordion
+  // ============================================================================
+  useEffect(() => {
+    if (timerDisabled) {
+      setIsAfterTimerEndsOpen(false)
+    }
+  }, [timerDisabled])
+
+  // ============================================================================
   // EFFECTS - Remaining timer sync to tray tooltip
   // ============================================================================
   useEffect(() => {
@@ -697,10 +717,15 @@ const App = () => {
 
               {/* Timer Configuration */}
               <Card padding="sm">
-                <div className="flex items-center justify-between gap-2 border-b border-editorial-border pb-2 mb-4">
+                <div
+                  className={cn(
+                    'flex items-center justify-between gap-2',
+                    isStopTimerOpen && 'border-b border-editorial-border pb-2 mb-4',
+                  )}
+                >
                   <div className="flex items-center gap-2.5">
                     <SectionIcon><Timer size={13} strokeWidth={1.75} /></SectionIcon>
-                    <SectionLabel bordered={false} className="mb-0 pb-0">Stop Timer</SectionLabel>
+                    <SectionLabel bordered={false} className="mb-0 pb-0">Set Timer</SectionLabel>
                   </div>
                   <div className="flex items-center gap-2">
                     {hasNoTimer && (
@@ -708,80 +733,92 @@ const App = () => {
                         <WarningHint aria-label="No timer set warning" />
                       </Tooltip>
                     )}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="timer-hours">Hours</Label>
-                    <Input
-                      id="timer-hours"
-                      type="number"
-                      min={0}
-                      max={99}
-                      value={timerHours}
-                      onChange={(event) => setTimerHours(event.target.value)}
-                      disabled={controlsDisabled}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="timer-minutes">Minutes</Label>
-                    <Input
-                      id="timer-minutes"
-                      type="number"
-                      min={0}
-                      max={59}
-                      value={timerMinutes}
-                      onChange={(event) => setTimerMinutes(event.target.value)}
-                      disabled={controlsDisabled}
-                      placeholder="0"
+                    <Switch
+                      aria-label="Toggle Set Timer section"
+                      checked={isStopTimerOpen}
+                      onChange={handleStopTimerAccordionToggle}
                     />
                   </div>
                 </div>
+                {isStopTimerOpen && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="timer-hours">Hours</Label>
+                      <Input
+                        id="timer-hours"
+                        type="number"
+                        min={0}
+                        max={99}
+                        value={timerHours}
+                        onChange={(event) => setTimerHours(event.target.value)}
+                        disabled={controlsDisabled}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="timer-minutes">Minutes</Label>
+                      <Input
+                        id="timer-minutes"
+                        type="number"
+                        min={0}
+                        max={59}
+                        value={timerMinutes}
+                        onChange={(event) => setTimerMinutes(event.target.value)}
+                        disabled={controlsDisabled}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                )}
               </Card>
 
               {/* Options */}
-              <Card
-                padding="sm"
-                className={cn('transition-opacity duration-300', timerDisabled && 'opacity-50')}
-              >
-                <div className="flex items-center justify-between gap-2 mb-4 border-b border-editorial-border pb-2">
+              <Card padding="sm">
+                <div
+                  className={cn(
+                    'flex items-center justify-between gap-2',
+                    isAfterTimerEndsOpen && 'border-b border-editorial-border pb-2 mb-4',
+                  )}
+                >
                   <div className="flex items-center gap-2.5">
                     <SectionIcon><Power size={13} strokeWidth={1.75} /></SectionIcon>
                     <SectionLabel bordered={false} className="mb-0 pb-0">After Timer Ends</SectionLabel>
                   </div>
-                  {timerDisabled ? (
-                    <span className="font-body text-[9px] font-bold uppercase tracking-widest text-editorial-muted select-none">
-                      Set a timer first
-                    </span>
-                  ) : DOT_DECORATION}
-                </div>
-                <div className={cn('flex flex-wrap gap-x-5 gap-y-3 py-1', timerDisabled && 'pointer-events-none')}>
-                  <Checkbox
-                    label="Screen Lock"
-                    tooltip={SCREEN_LOCK_TOOLTIP}
-                    checked={displayScreenLock}
+                  <Switch
+                    aria-label="Toggle After Timer Ends section"
+                    checked={isAfterTimerEndsOpen}
+                    onChange={handleAfterTimerEndsAccordionToggle}
                     disabled={timerDisabled}
-                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                      const checked = event.target.checked
-                      setScreenLock(checked)
-                      // Uncheck Shutdown when Screen Lock is disabled — shutdown requires it
-                      if (!checked) setShutdownAfterStop(false)
-                    }}
-                    readOnly={isActive}
-                  />
-                  <Checkbox
-                    label="Shutdown"
-                    tooltip={SHUTDOWN_TOOLTIP}
-                    checked={displayShutdownAfterStop}
-                    disabled={timerDisabled || !displayScreenLock}
-                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                      // Shutdown is only selectable once Screen Lock is enabled
-                      setShutdownAfterStop(event.target.checked)
-                    }}
-                    readOnly={isActive}
                   />
                 </div>
+                {isAfterTimerEndsOpen && (
+                  <div className={cn('flex flex-wrap gap-x-5 gap-y-3 py-1', timerDisabled && 'pointer-events-none')}>
+                    <Checkbox
+                      label="Screen Lock"
+                      tooltip={SCREEN_LOCK_TOOLTIP}
+                      checked={displayScreenLock}
+                      disabled={timerDisabled}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                        const checked = event.target.checked
+                        setScreenLock(checked)
+                        // Uncheck Shutdown when Screen Lock is disabled — shutdown requires it
+                        if (!checked) setShutdownAfterStop(false)
+                      }}
+                      readOnly={isActive}
+                    />
+                    <Checkbox
+                      label="Shutdown"
+                      tooltip={SHUTDOWN_TOOLTIP}
+                      checked={displayShutdownAfterStop}
+                      disabled={timerDisabled || !displayScreenLock}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                        // Shutdown is only selectable once Screen Lock is enabled
+                        setShutdownAfterStop(event.target.checked)
+                      }}
+                      readOnly={isActive}
+                    />
+                  </div>
+                )}
               </Card>
 
               {/* Controls */}

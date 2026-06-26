@@ -15,7 +15,7 @@
 4. [Features](#4-features)
    - [F1 — Start & Stop Automation](#f1--start--stop-automation)
    - [F2 — Automation Mode Selection](#f2--automation-mode-selection)
-   - [F3 — Stop Timer](#f3--stop-timer)
+   - [F3 — Set Timer](#f3--stop-timer)
    - [F4 — Close Upwork Tracker on Stop](#f4--close-upwork-tracker-on-stop)
    - [F5 — Optional System Shutdown](#f5--optional-system-shutdown)
    - [F6 — Activity Logging](#f6--activity-logging)
@@ -151,7 +151,7 @@ Two automation modes are available. Advanced Mode is always selected by default 
 
 ---
 
-### F3 — Stop Timer
+### F3 — Set Timer
 
 #### Description
 The user can configure the automation to stop automatically after a set duration.

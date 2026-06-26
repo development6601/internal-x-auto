@@ -26,12 +26,12 @@
 
 ---
 
-## 3. Stop Timer
+## 3. Set Timer
 
 - [ ] Hours and minutes inputs accept numeric values only
 - [ ] Hours field accepts 0–99; minutes field accepts 0–59
 - [ ] Both inputs are disabled while automation is active
-- [ ] Setting both to 0 shows the **warning icon** next to "Stop Timer"
+- [ ] Setting both to 0 shows the **warning icon** next to "Set Timer"
 - [ ] Warning tooltip text clearly explains "no timer set" behaviour
 - [ ] Setting a valid duration hides the warning icon
 - [ ] Timer inputs are cleared/disabled during countdown

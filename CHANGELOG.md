@@ -7,6 +7,62 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.0.14] — 2026-06-26
+
+**Author:** Manav Sonani
+
+### Added
+
+- **Screen Lock post-stop action**
+  - Replaced **Close Upwork** with **Screen Lock** in the UI and tray.
+  - Windows: `LockWorkStation` (same as Win+L). macOS: `CGSession -suspend`.
+  - Standalone screen lock shows a **10-second countdown modal** before locking;
+    user can cancel anytime.
+  - — `src/App.tsx`, `electron/core/post-stop.ts`, `electron/core/ipc.ts`,
+    `electron/preload.ts`, `src/types/electron-api.d.ts`
+
+- **Shutdown + Screen Lock combined flow**
+  - Selecting **Shutdown** auto-enables **Screen Lock**; shutdown cannot run
+    without lock first.
+  - After the 30-second shutdown countdown: lock screen, then shut down after
+    1 second.
+  - Windows shutdown uses detached `spawn` with `/f` so the command completes
+    reliably (fixes `shutdown /s /t 0` failing under `execSync`).
+  - — `src/App.tsx`, `electron/core/post-stop.ts`
+
+- **Single-instance app lock**
+  - Only one app instance can run; a second launch focuses the existing window
+    instead of opening another.
+  - — `electron/main.ts`
+
+- **Tray menu enhancements**
+  - **Quick Start** submenu: Start for 1 / 2 / 3 / 4 hours.
+  - **After Timer Ends** checkboxes (Screen Lock, Shutdown) synced with the
+    main UI.
+  - Tray icon uses the real app icon shape, tinted green (running) or red
+    (stopped) — icon colour only, not background.
+  - — `electron/core/tray.ts`, `electron/core/types.ts`, `electron/core/ipc.ts`,
+    `electron/preload.ts`, `src/App.tsx`
+
+- **Accordion sections with header switches**
+  - **Stop Timer** and **After Timer Ends** collapse/expand via a switch in the
+    section header.
+  - After Timer Ends switch is disabled until a stop timer is set; removed
+    “Set a timer first” label in favour of the disabled switch.
+  - — `src/App.tsx`, `src/components/ui/Switch.tsx`
+
+### Changed
+
+- Post-stop section heading renamed from **Post-Stop Options** to
+  **After Timer Ends**.
+  - — `src/App.tsx`
+
+### Build
+
+- Version bumped to `1.0.14` in `package.json` and `src/constants/app.constants.ts`.
+
+---
+
 ## [1.0.13] — 2026-06-26
 
 **Author:** Bhargav Tibadiya
