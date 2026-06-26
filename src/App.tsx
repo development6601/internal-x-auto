@@ -27,7 +27,7 @@ import useAutomation from '@/hooks/useAutomation'
 import useActivityLog from '@/hooks/useActivityLog'
 import usePrerequisites from '@/hooks/usePrerequisites'
 import useTheme from '@/hooks/useTheme'
-import useVoice from '@/hooks/useVoice'
+import useSound from '@/hooks/useSound'
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -221,7 +221,7 @@ const App = () => {
     onInstallFailure: handlePrereqInstallFailure,
   })
 
-  const { announceCountdownStart, announceStarted, announceStopped, announceShutdown } = useVoice()
+  const { playStartEnd, playSecondBeep } = useSound()
 
   // ============================================================================
   // COMPUTED VALUES
@@ -281,8 +281,7 @@ const App = () => {
     setCountdownSeconds(START_COUNTDOWN_SECONDS)
     setElapsedSeconds(0)
     setRemainingSeconds(durationSecs === 0 ? null : durationSecs)
-    announceCountdownStart()
-  }, [mode, totalTimerSeconds, screenLock, shutdownAfterStop, announceCountdownStart])
+  }, [mode, totalTimerSeconds, screenLock, shutdownAfterStop])
 
   const handleStartClick = useCallback(() => {
     if (isActive) return
@@ -326,7 +325,7 @@ const App = () => {
       automationStop({ reason: 'manual', elapsedSeconds })
     }
 
-    announceStopped()
+    playStartEnd()
     setStatus('stopped')
     setCountdownSeconds(null)
     setRemainingSeconds(null)
@@ -336,13 +335,12 @@ const App = () => {
       // Shutdown always runs with screen lock — show countdown modal first
       setShutdownCountdown(30)
       setShowShutdownModal(true)
-      announceShutdown()
     } else if (screenLock) {
       // Standalone screen lock — show 10-second countdown first
       setScreenLockCountdown(10)
       setShowScreenLockModal(true)
     }
-  }, [isActive, isRunning, elapsedSeconds, screenLock, shutdownAfterStop, automationStop, announceStopped, announceShutdown])
+  }, [isActive, isRunning, elapsedSeconds, screenLock, shutdownAfterStop, automationStop, playStartEnd])
 
   const handleCancelShutdown = useCallback(() => {
     setShowShutdownModal(false)
@@ -375,6 +373,11 @@ const App = () => {
   // EFFECTS - Countdown Timer
   // ============================================================================
   useEffect(() => {
+    if (!isCountdown || countdownSeconds === null || countdownSeconds <= 0) return
+    playSecondBeep()
+  }, [isCountdown, countdownSeconds, playSecondBeep])
+
+  useEffect(() => {
     if (!isCountdown || countdownSeconds === null) return
 
     if (countdownSeconds <= 0) {
@@ -385,7 +388,7 @@ const App = () => {
       }
       setStatus('running') // Optimistic — confirmed via IPC onStatus callback
       setCountdownSeconds(null)
-      announceStarted()
+      playStartEnd()
       return
     }
 
@@ -394,7 +397,7 @@ const App = () => {
     }, 1000)
 
     return () => window.clearTimeout(timerId)
-  }, [isCountdown, countdownSeconds, automationStart, announceStarted])
+  }, [isCountdown, countdownSeconds, automationStart, playStartEnd])
 
   // ============================================================================
   // EFFECTS - Running Timers
@@ -428,7 +431,7 @@ const App = () => {
   useEffect(() => {
     if (isRunning && !hasNoTimer && remainingSeconds === 0) {
       automationStop({ reason: 'timer', elapsedSeconds })
-      announceStopped()
+      playStartEnd()
       setStatus('stopped')
       setCountdownSeconds(null)
       setLockedPostStopOptions(null)
@@ -436,14 +439,13 @@ const App = () => {
         // Shutdown always runs with screen lock — show countdown modal first
         setShutdownCountdown(30)
         setShowShutdownModal(true)
-        announceShutdown()
       } else if (screenLock) {
         // Standalone screen lock — show 10-second countdown first
         setScreenLockCountdown(10)
         setShowScreenLockModal(true)
       }
     }
-  }, [isRunning, hasNoTimer, remainingSeconds, screenLock, shutdownAfterStop, elapsedSeconds, automationStop, announceStopped, announceShutdown])
+  }, [isRunning, hasNoTimer, remainingSeconds, screenLock, shutdownAfterStop, elapsedSeconds, automationStop, playStartEnd])
 
   // ============================================================================
   // EFFECTS - Shutdown Countdown
@@ -608,14 +610,12 @@ const App = () => {
                 disabled={isActive}
               />
 
-              {/* Theme toggle — cycles: system → light → dark → system */}
+              {/* Theme toggle — switches between light and dark */}
               <Tooltip
                 content={
-                  themeMode === 'system'
-                    ? 'Appearance: System default — click to switch to Light'
-                    : themeMode === 'light'
-                      ? 'Appearance: Light mode — click to switch to Dark'
-                      : 'Appearance: Dark mode — click to follow System'
+                  themeMode === 'light'
+                    ? 'Appearance: Light mode — click to switch to Dark'
+                    : 'Appearance: Dark mode — click to switch to Light'
                 }
                 maxWidth={220}
                 placement="bottom"
