@@ -3,6 +3,7 @@ import path from 'path'
 import type { Plugin } from 'vite'
 
 const RESOURCE_FILES = ['icon.ico', 'icon.png'] as const
+const SOUND_FILES = ['start-end.mp3', 'second-beep.mp3'] as const
 
 const copyPythonScripts = (srcDir: string, destDir: string): void => {
   if (!existsSync(srcDir)) return
@@ -27,7 +28,25 @@ const copyPythonScripts = (srcDir: string, destDir: string): void => {
   }
 }
 
-/** Copy raster app icons and runtime scripts into dist-electron. */
+const copySoundFiles = (): void => {
+  const soundSrc = path.resolve(process.cwd(), 'resources/sound')
+  if (!existsSync(soundSrc)) return
+
+  const publicDest = path.resolve(process.cwd(), 'public/sound')
+  const electronDest = path.resolve(process.cwd(), 'dist-electron/resources/sound')
+
+  mkdirSync(publicDest, { recursive: true })
+  mkdirSync(electronDest, { recursive: true })
+
+  for (const file of SOUND_FILES) {
+    const src = path.join(soundSrc, file)
+    if (!existsSync(src)) continue
+    cpSync(src, path.join(publicDest, file))
+    cpSync(src, path.join(electronDest, file))
+  }
+}
+
+/** Copy raster app icons, sounds, and runtime scripts into dist-electron. */
 function copyAppResources(): void {
   const resourceSrc = path.resolve(process.cwd(), 'resources')
   const resourceDest = path.resolve(process.cwd(), 'dist-electron/resources')
@@ -44,6 +63,8 @@ function copyAppResources(): void {
       }
     }
   }
+
+  copySoundFiles()
 
   mkdirSync(scriptDest, { recursive: true })
 

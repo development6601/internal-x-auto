@@ -70,7 +70,9 @@
           "tray-running.png",
           "tray-running@2x.png",
           "tray-stopped.png",
-          "tray-stopped@2x.png"
+          "tray-stopped@2x.png",
+          "sound/start-end.mp3",
+          "sound/second-beep.mp3"
         ]
       },
       {
