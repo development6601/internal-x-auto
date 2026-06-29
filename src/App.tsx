@@ -137,8 +137,8 @@ const App = () => {
   // ============================================================================
   const [status, setStatus] = useState<AutomationStatus>('stopped')
   const [mode, setMode] = useState<AutomationMode>('basic')
-  const [timerHours, setTimerHours] = useState('0')
-  const [timerMinutes, setTimerMinutes] = useState('0')
+  const [timerHours, setTimerHours] = useState('')
+  const [timerMinutes, setTimerMinutes] = useState('')
   const [screenLock, setScreenLock] = useState(false)
   const [shutdownAfterStop, setShutdownAfterStop] = useState(false)
 
@@ -752,7 +752,7 @@ const App = () => {
                         value={timerHours}
                         onChange={(event) => setTimerHours(event.target.value)}
                         disabled={controlsDisabled}
-                        placeholder="0"
+                        placeholder="Hours"
                       />
                     </div>
                     <div>
@@ -765,7 +765,7 @@ const App = () => {
                         value={timerMinutes}
                         onChange={(event) => setTimerMinutes(event.target.value)}
                         disabled={controlsDisabled}
-                        placeholder="0"
+                        placeholder="Minutes"
                       />
                     </div>
                   </div>

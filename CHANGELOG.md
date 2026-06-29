@@ -7,6 +7,23 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.0.15] — 2026-06-29
+
+**Author:** Manav Sonani
+
+### Changed
+
+- **Timer input defaults**
+  - Hours and Minutes fields now start blank instead of displaying `0`.
+  - Clearing an input leaves it empty; validation and timer behaviour are unchanged.
+  - — `src/App.tsx`
+
+### Build
+
+- Version bumped to `1.0.15` in `package.json` and `src/constants/app.constants.ts`.
+
+---
+
 ## [1.0.14] — 2026-06-26
 
 **Author:** Manav Sonani

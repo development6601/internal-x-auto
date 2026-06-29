@@ -1,8 +1,9 @@
 {
   "name": "automation-control",
   "productName": "InternalX",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "Automation Control Application",
+  "author": "Manav Sonani",
   "main": "dist-electron/main.js",
   "private": true,
   "type": "module",
